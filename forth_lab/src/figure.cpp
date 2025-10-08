@@ -81,3 +81,14 @@ std::istream& operator>>(std::istream& is, Figure<T>& fig) {
     }
     return is;
 }
+
+// Explicit template instantiations for Figure and its stream operators
+// for the scalar types used in the project.
+template class Figure<double>;
+template class Figure<int>;
+
+template std::ostream& operator<< <double>(std::ostream&, const Figure<double>&);
+template std::istream& operator>> <double>(std::istream&, Figure<double>&);
+
+template std::ostream& operator<< <int>(std::ostream&, const Figure<int>&);
+template std::istream& operator>> <int>(std::istream&, Figure<int>&);

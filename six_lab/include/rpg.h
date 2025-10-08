@@ -6,12 +6,8 @@
 #include <string>
 #include <vector>
 #include <cmath>
-#include <cstdlib>
 #include <sstream>
 #include <fstream>
-#include <shared_mutex>
-#include <utility>
-
 
 // Arena size
 const int MAP_MIN_X = 0;
@@ -46,10 +42,7 @@ public:
     bool defenderDead;
 
     explicit FightVisitor(NPC* attacker);
-    
-    int rollD6();
-    bool attackBeatsDefense();
-    
+
     void visit(Orc* d) override;
     void visit(Druid* d) override;
     void visit(Squirrel* d) override;
@@ -57,6 +50,23 @@ public:
 
 class NPC {
 public:
+    std::string name;
+    int x, y;
+    std::string type;
+    bool alive = true;
+
+    bool isDead() const noexcept { 
+        return !alive; 
+    }
+    
+    void kill() noexcept { 
+        alive = false; 
+    }
+
+    void revive() noexcept {
+        alive = true; 
+    }
+    
     NPC(const std::string& type, const std::string& name, int x, int y);
 
     virtual void accept(Visitor* v) = 0;
@@ -69,25 +79,6 @@ public:
     virtual std::string getName() const;
     virtual std::string serialize() const;
 
-    bool isDead() const noexcept;
-    void kill() noexcept;
-    void revive() noexcept;
-
-    int getX() const;
-    int getY() const;
-    std::pair<int, int> getPosition() const;
-    void setPosition(int px, int py);
-    void translateClamped(int dx, int dy);
-
-protected:
-    const std::string type;
-    const std::string name;
-
-private:
-    mutable std::shared_mutex stateMutex;
-    int x;
-    int y;
-    bool alive;
 };
 
 class Orc : public NPC {

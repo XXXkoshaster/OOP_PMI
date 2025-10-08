@@ -13,7 +13,7 @@ target_link_libraries(rpg_main PRIVATE rpg_lib)
 enable_testing()
 find_package(GTest REQUIRED)
 
-#add_executable(tests test.cpp)
-#target_link_libraries(tests PRIVATE rpg_lib GTest::gtest_main)
+add_executable(tests test.cpp)
+target_link_libraries(tests PRIVATE rpg_lib GTest::gtest_main)
 
 add_test(NAME ArrayTests COMMAND tests)

@@ -1,256 +1,196 @@
+#include "include/rpg.h"
 #include <thread>
 #include <mutex>
-#include <shared_mutex>
-#include <condition_variable>
-#include <queue>
-#include <random>
 #include <chrono>
 #include <atomic>
-#include <map>
+#include <vector>
+#include <string>
 #include <cstdlib>
 #include <ctime>
+#include <iostream>
 
-#include "../include/rpg.h"
+std::vector<std::shared_ptr<NPC>> npcs;
+std::mutex npcs_mx;
+std::atomic<bool> game_running(true);
+std::mutex count_mx;
 
-// ---- Карта для потоковой версии ----
-const int TMAP_W = 100;
-const int TMAP_H = 100;
-
-// ---- Глобальные мьютексы для вывода и доступа к NPC ----
-std::mutex cout_mtx;
-std::shared_mutex npcs_mtx;
-
-// ---- Очередь задач боёв: пара индексов в векторе NPC ----
-std::mutex fights_mtx;
-std::condition_variable fights_cv;
-std::queue<std::pair<int,int>> fights_q;
-
-// ---- Простые таблицы "хода" и "дистанции убийства" ----
-int moveDist(const NPC* n) {
-    std::string t = n->getType();
-    if (t == "Orc") return 20;
-    if (t == "Druid") return 10;
-    if (t == "Squirrel") return 5;
-    return 5;
-}
-int killDist(const NPC* n) {
-    std::string t = n->getType();
-    if (t == "Orc") return 10;
-    if (t == "Druid") return 10;
-    if (t == "Squirrel") return 5;
+int moveStepFor(const std::string& type) {
+    if (type == "Orc") {
+        return 20;
+    }
+    if (type == "Druid") {
+        return 10;
+    }
     return 5;
 }
 
-// Совместимость убийств по прежним правилам
-bool canKill(const NPC* a, const NPC* b) {
-    if (a->getType() == "Orc" && b->getType() == "Druid") return true;
-    if (a->getType() == "Druid" && b->getType() == "Squirrel") return true;
-    return false;
-}
-
-// «Боевая кость» 1..6
-int d6() {
-    return (std::rand() % 6) + 1;
-}
-
-// Простейший контейнер «жив/мертв»
-struct Actor {
-    std::shared_ptr<NPC> npc;
-    bool alive;
-};
-
-// Случайное смещение в пределах длины шага (манхэттен-стиль, чтобы не «ускорять» диагонали)
-static int clamp(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
-
-void randomStep(Actor& a) {
-    if (!a.alive) return;
-    int step = moveDist(a.npc.get());
-    // случайное смещение от -step до +step по x и y, но обычным образом ограничим карту
-    int dx = (std::rand() % (2*step + 1)) - step;
-    int dy = (std::rand() % (2*step + 1)) - step;
-
-    int nx = clamp(a.npc->x + dx, 0, TMAP_W);
-    int ny = clamp(a.npc->y + dy, 0, TMAP_H);
-    a.npc->x = nx;
-    a.npc->y = ny;
-}
-
-// Печать карты (живые отображаются первой буквой типа)
-void printMap(const std::vector<Actor>& actors) {
-    const int W = TMAP_W, H = TMAP_H;
-    // грубая, но простая печать: покажем только список координат, чтобы не засорять экран
-    std::lock_guard<std::mutex> lk(cout_mtx);
-    std::cout << "---- MAP ----" << std::endl;
-    for (size_t i = 0; i < actors.size(); ++i) {
-        if (!actors[i].alive) continue;
-        char c = '?';
-        std::string t = actors[i].npc->getType();
-        if (t == "Orc") c = 'O';
-        else if (t == "Druid") c = 'D';
-        else if (t == "Squirrel") c = 'S';
-        std::cout << c << " \"" << actors[i].npc->getName() << "\" at ("
-                  << actors[i].npc->x << "," << actors[i].npc->y << ")\n";
+int killRangeFor(const std::string& type) {
+    if (type == "Orc") {
+        return 10;
     }
-    std::cout << "-------------" << std::endl;
+    if (type == "Druid") {
+        return 10;
+    }
+    if (type == "Squirrel") {
+        return 5;
+    }
+    return 10;
 }
 
-// Поток движения + обнаружения боёв
-void movementThread(std::vector<Actor>& actors,
-                    std::atomic<bool>& running) {
-    while (running.load()) {
-        {
-            // перемещение
-            std::unique_lock<std::shared_mutex> ul(npcs_mtx);
-            for (size_t i = 0; i < actors.size(); ++i) {
-                if (actors[i].alive) randomStep(actors[i]);
-            }
-        }
+int KillRange() {
+    return std::max({killRangeFor("Orc"), killRangeFor("Druid"), killRangeFor("Squirrel")});
+}
 
-        // поиск пар на «расстоянии убийства»
-        {
-            std::shared_lock<std::shared_mutex> sl(npcs_mtx);
-            for (size_t i = 0; i < actors.size(); ++i) {
-                if (!actors[i].alive) continue;
-                for (size_t j = i + 1; j < actors.size(); ++j) {
-                    if (!actors[j].alive) continue;
-                    double dist = actors[i].npc->distanceTo(actors[j].npc.get());
-                    int kd = std::min(killDist(actors[i].npc.get()),
-                                      killDist(actors[j].npc.get()));
-                    if (dist <= kd) {
-                        std::lock_guard<std::mutex> ql(fights_mtx);
-                        fights_q.push({(int)i,(int)j});
-                    }
-                }
-            }
-        }
-        fights_cv.notify_one();
+int projectValue(int value, int minValue, int maxValue, int limit) {
+    int result = 0;
+    if (maxValue != minValue) {
+        result = (value - minValue) * (limit - 1) / (maxValue - minValue);
+    }
+    if (result < 0) {
+        result = 0;
+    }
+    if (result >= limit) {
+        result = limit - 1;
+    }
+    return result;
+}
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+void renderMap(int width = 60, int height = 24) {
+    std::vector<std::string> canvas(height, std::string(width, '.'));
+    std::size_t alive = 0;
+
+    {
+        std::lock_guard<std::mutex> locker(npcs_mx);
+        alive = npcs.size();
+        for (std::size_t i = 0; i < npcs.size(); ++i) {
+            std::shared_ptr<NPC> npc = npcs[i];
+            std::string type = npc->getType();
+            char marker = '?';
+            if (type == "Orc") {
+                marker = 'O';
+            } else if (type == "Druid") {
+                marker = 'D';
+            } else if (type == "Squirrel") {
+                marker = 'S';
+            }
+
+            std::pair<int, int> pos = npc->getPosition();
+            int cx = projectValue(pos.first, MAP_MIN_X, MAP_MAX_X, width);
+            int cy = projectValue(pos.second, MAP_MIN_Y, MAP_MAX_Y, height);
+            int row = height - 1 - cy;
+            if (row < 0) {
+                row = 0;
+            }
+            if (row >= height) {
+                row = height - 1;
+            }
+            canvas[row][cx] = marker;
+        }
+    }
+
+    std::lock_guard<std::mutex> outlk(count_mx);
+    std::cout << "\n=== MAP (alive: " << alive << ") ===\n";
+    for (int i = 0; i < height; ++i) {
+        std::cout << canvas[i] << "\n";
     }
 }
 
-// Поток боёв: достаёт пары из очереди и разыгрывает d6
-void combatThread(std::vector<Actor>& actors,
-                  std::vector<std::shared_ptr<Observer>>& observers,
-                  std::atomic<bool>& running) {
-    while (running.load()) {
-        std::unique_lock<std::mutex> ql(fights_mtx);
-        fights_cv.wait_for(ql, std::chrono::milliseconds(200), []{ return !fights_q.empty(); });
-        if (!fights_q.empty()) {
-            auto p = fights_q.front(); fights_q.pop();
-            ql.unlock();
+void initNPCs() {
+    std::vector<std::string> types;
+    types.push_back("Orc");
+    types.push_back("Druid");
+    types.push_back("Squirrel");
 
-            int i = p.first, j = p.second;
+    std::lock_guard<std::mutex> locker(npcs_mx);
+    npcs.clear();
 
-            // копия указателей + проверка статусов под shared-lock
-            std::shared_lock<std::shared_mutex> sl(npcs_mtx);
-            if (i < 0 || j < 0 || i >= (int)actors.size() || j >= (int)actors.size()) continue;
-            if (!actors[i].alive || !actors[j].alive) continue;
-            NPC* a = actors[i].npc.get();
-            NPC* b = actors[j].npc.get();
-            double dist = a->distanceTo(b);
-            int kd = std::min(killDist(a), killDist(b));
-            if (dist > kd) continue; // вдруг разошлись
-            bool aCan = canKill(a, b);
-            bool bCan = canKill(b, a);
-            sl.unlock();
+    int created = 0;
+    int attempts = 0;
+    while (created < 50 && attempts < 5000) {
+        attempts++;
 
-            // если никто никого не может убивать — пропускаем
-            if (!aCan && !bCan) continue;
+        std::string type = types[std::rand() % types.size()];
+        std::string name = type + "_" + std::to_string(created + 1);
+        int x = MAP_MIN_X + std::rand() % (MAP_MAX_X - MAP_MIN_X + 1);
+        int y = MAP_MIN_Y + std::rand() % (MAP_MAX_Y - MAP_MIN_Y + 1);
 
-            // кидаем кубики
-            int atkA = aCan ? d6() : 0;
-            int defB = aCan ? d6() : 0;
-            int atkB = bCan ? d6() : 0;
-            int defA = bCan ? d6() : 0;
-
-            bool killB = aCan && (atkA > defB);
-            bool killA = bCan && (atkB > defA);
-
-            // отметим смерти под unique-lock
-            {
-                std::unique_lock<std::shared_mutex> ul(npcs_mtx);
-                if (killB && actors[j].alive) {
-                    actors[j].alive = false;
-                    std::string ev = actors[i].npc->getName() + " killed " + actors[j].npc->getName();
-                    for (size_t k = 0; k < observers.size(); ++k) observers[k]->update(ev);
-                    std::lock_guard<std::mutex> lk(cout_mtx);
-                    std::cout << ev << std::endl;
-                }
-                if (killA && actors[i].alive) {
-                    actors[i].alive = false;
-                    std::string ev = actors[j].npc->getName() + " killed " + actors[i].npc->getName();
-                    for (size_t k = 0; k < observers.size(); ++k) observers[k]->update(ev);
-                    std::lock_guard<std::mutex> lk(cout_mtx);
-                    std::cout << ev << std::endl;
-                }
-            }
+        std::shared_ptr<NPC> npc = NPCFactory::create(type, name, x, y);
+        if (npc && isNameUnique(npcs, name)) {
+            npcs.push_back(npc);
+            created++;
         }
     }
 }
 
-// Основной поток: раз в секунду печатает карту
-void printerLoop(const std::vector<Actor>& actors,
-                 std::atomic<bool>& running) {
-    while (running.load()) {
+void movementThread() {
+    while (game_running.load(std::memory_order_relaxed)) {
         {
-            std::shared_lock<std::shared_mutex> sl(npcs_mtx);
-            printMap(actors);
+            std::lock_guard<std::mutex> locker(npcs_mx);
+            for (std::size_t i = 0; i < npcs.size(); ++i) {
+                std::shared_ptr<NPC> npc = npcs[i];
+                int maxStep = moveStepFor(npc->getType());
+                int dx = std::rand() % (maxStep * 2 + 1) - maxStep;
+                int dy = std::rand() % (maxStep * 2 + 1) - maxStep;
+                npc->translateClamped(dx, dy);
+            }
         }
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+}
+
+void fightsThread(std::vector<std::shared_ptr<Observer>> observers) {
+    Arena arena;
+    double range = static_cast<double>(KillRange());
+
+    while (game_running.load(std::memory_order_relaxed)) {
+        {
+            std::lock_guard<std::mutex> locker(npcs_mx);
+            if (!npcs.empty()) {
+                arena.startBattle(npcs, range, observers);
+            }
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 }
 
 int main() {
-    std::srand((unsigned)std::time(nullptr));
+    std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
-    // Наблюдатели
     std::vector<std::shared_ptr<Observer>> observers;
     observers.push_back(std::make_shared<ConsoleObserver>());
-    observers.push_back(std::make_shared<FileObserver>("log.txt"));
+    observers.push_back(std::make_shared<FileObserver>("battle.log"));
 
-    // 50 случайных NPC
-    std::vector<Actor> actors;
-    for (int i = 0; i < 50; ++i) {
-        int kind = std::rand() % 3; // 0=Orc, 1=Druid, 2=Squirrel
-        int x = std::rand() % (TMAP_W + 1);
-        int y = std::rand() % (TMAP_H + 1);
-        std::string name = "N" + std::to_string(i);
-        std::shared_ptr<NPC> npc;
-        if (kind == 0) npc = NPCFactory::create("Orc", name, x, y);
-        else if (kind == 1) npc = NPCFactory::create("Druid", name, x, y);
-        else npc = NPCFactory::create("Squirrel", name, x, y);
-        Actor a; a.npc = npc; a.alive = true;
-        actors.push_back(a);
+    initNPCs();
+
+    std::thread movement(movementThread);
+    std::thread fights(fightsThread, observers);
+
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    while (std::chrono::steady_clock::now() - start < std::chrono::seconds(30)) {
+        renderMap();
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        std::lock_guard<std::mutex> locker(npcs_mx);
+        if (npcs.empty()) {
+            break;
+        }
     }
 
-    std::atomic<bool> running(true);
+    game_running.store(false);
 
-    // Потоки
-    std::thread mover([&]{ movementThread(actors, running); });
-    std::thread fighter([&]{ combatThread(actors, observers, running); });
-    std::thread printer([&]{ printerLoop(actors, running); });
+    if (movement.joinable()) {
+        movement.join();
+    }
+    if (fights.joinable()) {
+        fights.join();
+    }
 
-    // 30 секунд игры
-    std::this_thread::sleep_for(std::chrono::seconds(30));
-    running.store(false);
-    fights_cv.notify_all();
-
-    mover.join();
-    fighter.join();
-    printer.join();
-
-    // Выводим выживших
     {
-        std::shared_lock<std::shared_mutex> sl(npcs_mtx);
-        std::lock_guard<std::mutex> lk(cout_mtx);
-        std::cout << "\n=== SURVIVORS ===\n";
-        for (size_t i = 0; i < actors.size(); ++i) {
-            if (actors[i].alive) {
-                actors[i].npc->print();
-            }
-        }
-        std::cout << "=================\n";
+        std::lock_guard<std::mutex> outlk(count_mx);
+        std::cout << "\n=== SURVIVORS (" << npcs.size() << ") ===\n";
+    }
+    {
+        std::lock_guard<std::mutex> locker(npcs_mx);
+        printNPCs(npcs);
     }
 
     return 0;

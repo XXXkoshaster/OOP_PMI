@@ -38,7 +38,7 @@ protected:
     int sides;                         
 
 public:
-    constexpr RegularPolygon(int sides = 3, double radius = 1.0, std::pair<double, double> center = {0, 0});
+    RegularPolygon(int sides = 3, double radius = 1.0, std::pair<double, double> center = {0, 0});
     RegularPolygon(const RegularPolygon& other); 
     RegularPolygon(RegularPolygon&& other) noexcept;
     std::pair<double, double> GeometricCenter() const override;

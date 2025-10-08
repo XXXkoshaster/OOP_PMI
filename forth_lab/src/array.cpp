@@ -1,4 +1,6 @@
 #include "../include/array.h"
+#include "../include/figure.h"
+#include <memory>
 
 template <typename T, typename Alloc>
 Array<T, Alloc>::Array() : data_(nullptr), size_(0), capacity_(0) {}
@@ -206,3 +208,7 @@ void Array<T, Alloc>::Resize(size_t count, const T& value) {
         size_ = count;
     }
 }
+
+
+template class Array<int>;
+template class Array<std::shared_ptr<Figure<double>>>;

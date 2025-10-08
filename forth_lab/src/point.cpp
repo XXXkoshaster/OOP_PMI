@@ -1,8 +1,5 @@
 #include "../include/point.h"
 
-#include <istream>
-#include <ostream>
-
 template <Scalar T>
 Point<T>::Point(T x, T y) : _x(x), _y(y) {}
 
@@ -32,3 +29,12 @@ std::istream& operator>>(std::istream& is, Point<T>& p) {
     is >> p._x >> p._y;
     return is;
 }
+
+template class Point<double>;
+template class Point<int>;
+
+template std::ostream& operator<< <double>(std::ostream&, const Point<double>&);
+template std::istream& operator>> <double>(std::istream&, Point<double>&);
+
+template std::ostream& operator<< <int>(std::ostream&, const Point<int>&);
+template std::istream& operator>> <int>(std::istream&, Point<int>&);

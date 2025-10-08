@@ -1,7 +1,7 @@
 #include "../include/figure.h"
 #include <iostream>
 
-constexpr RegularPolygon::RegularPolygon(int sides, double radius, std::pair<double, double> center)
+RegularPolygon::RegularPolygon(int sides, double radius, std::pair<double, double> center)
     : sides(sides), radius(radius), center(center) {}
 
 RegularPolygon::RegularPolygon(const RegularPolygon& other)
@@ -44,18 +44,23 @@ bool RegularPolygon::operator==(const Figure& other) const {
 }
 
 Figure& RegularPolygon::operator=(const Figure& other) {
-    if (this == &other) return *this;
+    if (this == &other) 
+        return *this;
+    
     const RegularPolygon* o = dynamic_cast<const RegularPolygon*>(&other);
     if (o) {
         sides = o->sides;
         radius = o->radius;
         center = o->center;
     }
+    
     return *this;
 }
 
 Figure& RegularPolygon::operator=(Figure&& other) noexcept {
-    if (this == &other) return *this;
+    if (this == &other) 
+        return *this;
+    
     RegularPolygon* o = dynamic_cast<RegularPolygon*>(&other);
     if (o) {
         sides = o->sides;

@@ -55,3 +55,8 @@ Point<T> NAngle<T, N>::get_barycenter() const {
     }
     return Point<T>(sum_x / vertices_number_, sum_y / vertices_number_);
 }
+
+template class NAngle<double, 5>;
+template class NAngle<double, 6>;
+template class NAngle<double, 8>;
+template class NAngle<int, 3>;

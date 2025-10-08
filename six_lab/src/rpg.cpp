@@ -1,28 +1,14 @@
 #include "../include/rpg.h"
 
-#include <algorithm>
-#include <mutex>
-#include <shared_mutex>
-#include <cstdlib>
-
-int FightVisitor::rollD6() {
-    return std::rand() % 6 + 1;
-}
-
-bool FightVisitor::attackBeatsDefense() {
-    const int attack = rollD6();
-    const int defense = rollD6();
-    return attack > defense;
-}
-
 void ConsoleObserver::update(const std::string& event) {
     std::cout << event << std::endl;
 }
 
 FileObserver::FileObserver(const std::string& filename) {
     logFile.open(filename, std::ios::app);
-    if (!logFile.is_open())
+    if (!logFile.is_open()) {
         std::cerr << "cannot open log file: " << filename << std::endl;
+    }
 }
 void FileObserver::update(const std::string& event) {
     if (logFile.is_open()) {
@@ -39,68 +25,20 @@ NPC::NPC(const std::string& t, const std::string& n, int px, int py)
 std::string NPC::getType() const { return type; }
 std::string NPC::getName() const { return name; }
 
-bool NPC::isDead() const noexcept {
-    std::shared_lock lock(stateMutex);
-    return !alive;
-}
-
-void NPC::kill() noexcept {
-    std::unique_lock lock(stateMutex);
-    alive = false;
-}
-
-void NPC::revive() noexcept {
-    std::unique_lock lock(stateMutex);
-    alive = true;
-}
-
-int NPC::getX() const {
-    std::shared_lock lock(stateMutex);
-    return x;
-}
-
-int NPC::getY() const {
-    std::shared_lock lock(stateMutex);
-    return y;
-}
-
-std::pair<int, int> NPC::getPosition() const {
-    std::shared_lock lock(stateMutex);
-    return {x, y};
-}
-
-void NPC::setPosition(int px, int py) {
-    std::unique_lock lock(stateMutex);
-    x = px;
-    y = py;
-}
-
-void NPC::translateClamped(int dx, int dy) {
-    std::unique_lock lock(stateMutex);
-    x = std::clamp(x + dx, MAP_MIN_X, MAP_MAX_X);
-    y = std::clamp(y + dy, MAP_MIN_Y, MAP_MAX_Y);
+void NPC::print() const {
+    std::cout << type << " \"" << name << "\" at (" << x << "," << y << ")" << (isDead() ? " [DEAD]" : "") << "\n";
 }
 
 double NPC::distanceTo(const NPC* other) const {
-    const auto [sx, sy] = getPosition();
-    const auto [ox, oy] = other->getPosition();
-    double dx = static_cast<double>(sx - ox);
-    double dy = static_cast<double>(sy - oy);
-    return std::sqrt(dx * dx + dy * dy);
+    double dx = (double)x - (double)other->x;
+    double dy = (double)y - (double)other->y;
+    return std::sqrt(dx*dx + dy*dy);
 }
 
 std::string NPC::serialize() const {
     std::ostringstream oss;
-    const auto [px, py] = getPosition();
-    const bool dead = isDead();
-    oss << type << " " << name << " " << px << " " << py << " " << (dead ? "dead" : "alive");
+    oss << type << " " << name << " " << x << " " << y << (alive ? "alive" : "dead");
     return oss.str();
-}
-
-void NPC::print() const {
-    const auto [px, py] = getPosition();
-    const bool dead = isDead();
-    std::cout << type << " \"" << name << "\" at (" << px << "," << py << ")" << (dead ? " [DEAD]" : "") << "\n";
 }
 
 bool NPC::inBounds(int px, int py) {
@@ -108,56 +46,61 @@ bool NPC::inBounds(int px, int py) {
 }
 
 Orc::Orc(const std::string& name, int x, int y) : NPC("Orc", name, x, y) {}
-void Orc::accept(Visitor* v) {
-    v->visit(this);
+void Orc::accept(Visitor* v) { 
+    v->visit(this); 
 }
 
 Druid::Druid(const std::string& name, int x, int y) : NPC("Druid", name, x, y) {}
-void Druid::accept(Visitor* v) {
-    v->visit(this);
+void Druid::accept(Visitor* v) { 
+    v->visit(this); 
 }
 
 Squirrel::Squirrel(const std::string& name, int x, int y) : NPC("Squirrel", name, x, y) {}
-void Squirrel::accept(Visitor* v) {
-    v->visit(this);
+void Squirrel::accept(Visitor* v) { 
+    v->visit(this); 
 }
+
 
 FightVisitor::FightVisitor(NPC* a) : attacker(a), defender(nullptr), attackerDead(false), defenderDead(false) {}
 
 void FightVisitor::visit(Orc* d) {
     defender = d;
-    if (attacker->getType() == "Druid") {} 
-    else if (attacker->getType() == "Orc") {} 
-    else if (attacker->getType() == "Squirrel") {}
+    if (attacker->getType() == "Druid") {
+    } else if (attacker->getType() == "Orc") {
+    } else if (attacker->getType() == "Squirrel") {
+    }
 }
 
 void FightVisitor::visit(Druid* d) {
     defender = d;
     if (attacker->getType() == "Orc") {
-        defenderDead = attackBeatsDefense();
-    } else if (attacker->getType() == "Druid") {} 
-    else if (attacker->getType() == "Squirrel") {}
+        defenderDead = true;
+    } else if (attacker->getType() == "Druid") {
+    } else if (attacker->getType() == "Squirrel") {
+    }
 }
 
 void FightVisitor::visit(Squirrel* d) {
     defender = d;
     if (attacker->getType() == "Druid") {
-        defenderDead = attackBeatsDefense();
-    } else if (attacker->getType() == "Orc") {} 
-    else if (attacker->getType() == "Squirrel") {}
+        defenderDead = true;
+    } else if (attacker->getType() == "Orc") {
+    } else if (attacker->getType() == "Squirrel") {
+    }
 }
 
+
 std::shared_ptr<NPC> NPCFactory::create(const std::string& type, const std::string& name, int x, int y) {
-    if (!NPC::inBounds(x, y))
+    if (!NPC::inBounds(x, y)) 
         return std::shared_ptr<NPC>();
 
-    if (type == "Orc")
+    if (type == "Orc") 
         return std::make_shared<Orc>(name, x, y);
 
-    if (type == "Druid")
+    if (type == "Druid") 
         return std::make_shared<Druid>(name, x, y);
 
-    if (type == "Squirrel")
+    if (type == "Squirrel") 
         return std::make_shared<Squirrel>(name, x, y);
 
     return std::shared_ptr<NPC>();
@@ -167,19 +110,19 @@ std::shared_ptr<NPC> NPCFactory::loadFromLine(const std::string& line) {
     std::istringstream iss(line);
     std::string type, name, state;
     int x, y;
-
+    
     if (!(iss >> type >> name >> x >> y))
         return std::shared_ptr<NPC>();
-
+    
     auto npc = create(type, name, x, y);
-
+    
     if (!npc)
         return npc;
 
     if (iss >> state) {
-        if (state == "dead" || state == "0")
+        if (state == "dead" || state == "0") 
             npc->kill();
-        else
+        else 
             npc->revive();
     }
 
@@ -189,21 +132,21 @@ std::shared_ptr<NPC> NPCFactory::loadFromLine(const std::string& line) {
 void Arena::startBattle(std::vector<std::shared_ptr<NPC>>& npcs,
                         double range,
                         std::vector<std::shared_ptr<Observer>>& observers) {
-
+   
     std::vector<int> alive(npcs.size(), 1);
 
     for (size_t i = 0; i < npcs.size(); ++i) {
-        if (!alive[i])
+        if (!alive[i]) 
             continue;
 
         for (size_t j = i + 1; j < npcs.size(); ++j) {
-            if (!alive[j])
+            if (!alive[j]) 
                 continue;
 
             NPC* a = npcs[i].get();
             NPC* b = npcs[j].get();
 
-            if (a->distanceTo(b) > range)
+            if (a->distanceTo(b) > range) 
                 continue;
 
             FightVisitor v1(a);
@@ -214,19 +157,19 @@ void Arena::startBattle(std::vector<std::shared_ptr<NPC>>& npcs,
                 a->accept(&v2);
             }
 
-            bool killA = v1.attackerDead || v2.defenderDead;
+            bool killA = v1.attackerDead || v2.defenderDead; 
             bool killB = v1.defenderDead || v2.attackerDead;
 
             if (killA && alive[i]) {
                 alive[i] = 0;
                 std::string ev = b->getName() + " killed " + a->getName();
-                for (size_t k = 0; k < observers.size(); ++k)
+                for (size_t k = 0; k < observers.size(); ++k) 
                     observers[k]->update(ev);
             }
             if (killB && alive[j]) {
                 alive[j] = 0;
                 std::string ev = a->getName() + " killed " + b->getName();
-                for (size_t k = 0; k < observers.size(); ++k)
+                for (size_t k = 0; k < observers.size(); ++k) 
                     observers[k]->update(ev);
             }
         }
@@ -234,7 +177,7 @@ void Arena::startBattle(std::vector<std::shared_ptr<NPC>>& npcs,
 
     std::vector<std::shared_ptr<NPC>> aliveList;
     for (size_t i = 0; i < npcs.size(); ++i) {
-        if (alive[i])
+        if (alive[i]) 
             aliveList.push_back(npcs[i]);
     }
 
@@ -247,37 +190,32 @@ void printNPCs(const std::vector<std::shared_ptr<NPC>>& npcs) {
     }
 }
 
-bool saveToFile(const std::vector<std::shared_ptr<NPC>>& npcs, const std::string& filename) {
+bool saveToFile(const std::vector<std::shared_ptr<NPC>>& npcs,
+                const std::string& filename) {
     std::ofstream out(filename.c_str());
-    if (!out.is_open()) 
-        return false;
-
-    for (size_t i = 0; i < npcs.size(); ++i)
+    if (!out.is_open()) return false;
+    for (size_t i = 0; i < npcs.size(); ++i) {
         out << npcs[i]->serialize() << "\n";
-
+    }
     return true;
 }
 
 bool loadFromFile(std::vector<std::shared_ptr<NPC>>& out, const std::string& filename) {
     std::ifstream in(filename);
-    if (!in.is_open()) 
-        return false;
-
+    if (!in.is_open()) return false;
     std::string line;
     while (std::getline(in, line)) {
         std::shared_ptr<NPC> npc = NPCFactory::loadFromLine(line);
-        
-        if (npc)
+        if (npc) 
             out.push_back(npc);
     }
-
     return true;
 }
 
-bool isNameUnique(const std::vector<std::shared_ptr<NPC>>& npcs, const std::string& name) {
+bool isNameUnique(const std::vector<std::shared_ptr<NPC>>& npcs,
+                  const std::string& name) {
     for (size_t i = 0; i < npcs.size(); ++i) {
-        if (npcs[i]->getName() == name) 
-            return false;
+        if (npcs[i]->getName() == name) return false;
     }
     return true;
 }
