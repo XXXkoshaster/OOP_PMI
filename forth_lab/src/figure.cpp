@@ -42,11 +42,13 @@ bool Figure<T>::operator==(const Figure& other) const {
     if (_vertices.size() != other._vertices.size()) {
         return false;
     }
+    
     for (size_t i = 0; i < _vertices.size(); ++i) {
         if (*_vertices[i] != *other._vertices[i]) {
             return false;
         }
     }
+    
     return true;
 }
 
@@ -82,8 +84,6 @@ std::istream& operator>>(std::istream& is, Figure<T>& fig) {
     return is;
 }
 
-// Explicit template instantiations for Figure and its stream operators
-// for the scalar types used in the project.
 template class Figure<double>;
 template class Figure<int>;
 

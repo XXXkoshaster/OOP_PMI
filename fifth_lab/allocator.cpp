@@ -7,10 +7,19 @@
 #include <iterator>
 
 class FixedBlockMemoryResource : public std::pmr::memory_resource {
+private:
+    struct Block {
+        char* ptr;
+        size_t size;
+        bool free;
+    };
+
+    char* buffer_;
+    size_t total_;
+    std::list<Block> blocks_;
+
 public:
-    explicit FixedBlockMemoryResource(size_t total_bytes)
-        : buffer_(nullptr), total_(total_bytes)
-    {
+    explicit FixedBlockMemoryResource(size_t total_bytes) : buffer_(nullptr), total_(total_bytes) {
         buffer_ = static_cast<char*>(::operator new(total_));
         Block b;
         b.ptr = buffer_;
@@ -27,11 +36,15 @@ public:
 
 protected:
     void* do_allocate(size_t bytes, size_t alignment) override {
-        if (bytes == 0) bytes = 1;
-        if (alignment == 0) alignment = alignof(std::max_align_t);
+        if (bytes == 0)
+            bytes = 1;
+
+        if (alignment == 0)
+            alignment = alignof(std::max_align_t);
 
         for (auto it = blocks_.begin(); it != blocks_.end(); ++it) {
-            if (!it->free) continue;
+            if (!it->free)
+                continue;
 
             char* block_begin = it->ptr;
             size_t space = it->size;
@@ -76,7 +89,9 @@ protected:
     }
 
     void do_deallocate(void* p, size_t /*bytes*/, size_t /*alignment*/) override {
-        if (!p) return;
+        if (!p) 
+            return;
+            
         char* cp = static_cast<char*>(p);
 
         for (auto it = blocks_.begin(); it != blocks_.end(); ++it) {
@@ -110,14 +125,4 @@ protected:
         return this == &other;
     }
 
-private:
-    struct Block {
-        char* ptr;
-        size_t size;
-        bool free;
-    };
-
-    char* buffer_;
-    size_t total_;
-    std::list<Block> blocks_;
 };

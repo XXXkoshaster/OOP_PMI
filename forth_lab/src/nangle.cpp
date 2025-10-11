@@ -1,31 +1,48 @@
 #include "../include/nangle.h"
 
 template <Scalar T, size_t N>
-NAngle<T, N>::NAngle() noexcept : vertices_number_(N) {
-    points_.resize(N);
+NAngle<T, N>::NAngle() noexcept : vertices_number_(0) {
+    points_.reserve(N);
 }
 
 template <Scalar T, size_t N>
-NAngle<T, N>::NAngle(const NAngle& other) noexcept : vertices_number_(N), points_(other.points_) {}
+NAngle<T, N>::NAngle(const NAngle& other) noexcept : Figure<T>(other), vertices_number_(other.vertices_number_), points_(other.points_) {}
 
 template <Scalar T, size_t N>
 NAngle<T, N>::NAngle(const std::initializer_list<std::pair<T, T>>& points) : NAngle() {
     if (points.size() != N) {
         throw std::runtime_error("Trying to initialize " + std::to_string(N) + "-angle with incorrect count of points.");
     }
-    size_t i = 0;
     for (const auto& point : points) {
-        points_[i] = Point<T>(point.first, point.second);
-        ++i;
+        add_vertex(Point<T>(point.first, point.second));
     }
 }
 
 template <Scalar T, size_t N>
 NAngle<T, N>& NAngle<T, N>::operator=(const NAngle& other) {
     if (this != &other) {
+        Figure<T>::operator=(other);
+        vertices_number_ = other.vertices_number_;
         points_ = other.points_;
     }
     return *this;
+}
+
+template <Scalar T, size_t N>
+void NAngle<T, N>::add_vertex(const Point<T>& point) {
+    if (vertices_number_ >= N) {
+        throw std::runtime_error("Trying to add more vertices than allowed for N-angle.");
+    }
+
+    Figure<T>::add_vertex(point);
+
+    if (points_.size() > vertices_number_) {
+        points_[vertices_number_] = point;
+    } else {
+        points_.push_back(point);
+    }
+
+    ++vertices_number_;
 }
 
 template <Scalar T, size_t N>
@@ -47,6 +64,10 @@ double NAngle<T, N>::area() const {
 
 template <Scalar T, size_t N>
 Point<T> NAngle<T, N>::get_barycenter() const {
+    if (vertices_number_ == 0) {
+        return Point<T>();
+    }
+
     T sum_x = 0;
     T sum_y = 0;
     for (const auto& point : points_) {

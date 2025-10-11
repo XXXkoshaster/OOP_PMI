@@ -13,7 +13,7 @@ struct ComplexType {
         : id(id_), name(name_), value(value_) {}
 };
 
-void DemonstrateDynamicArray() {
+int main() {
     std::cout << "DynamicArray with int" << std::endl;
     DynamicArray<int> intArr;
     intArr.PushBack(10);
@@ -67,9 +67,6 @@ void DemonstrateDynamicArray() {
         std::cout << "PopBack: " << allocArr[allocArr.Size() - 1] << std::endl;
         allocArr.PopBack();
     }
-}
-
-int main() {
-    DemonstrateDynamicArray();
+    
     return 0;
 }

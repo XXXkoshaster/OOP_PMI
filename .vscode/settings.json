@@ -46,6 +46,8 @@
         "__tree": "cpp",
         "list": "cpp",
         "map": "cpp",
-        "thread": "cpp"
+        "thread": "cpp",
+        "iomanip": "cpp",
+        "complex": "cpp"
     }
 }

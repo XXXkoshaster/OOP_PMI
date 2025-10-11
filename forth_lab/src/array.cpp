@@ -8,18 +8,22 @@ Array<T, Alloc>::Array() : data_(nullptr), size_(0), capacity_(0) {}
 template <typename T, typename Alloc>
 Array<T, Alloc>::Array(size_t count, const T& value) : Array() {
     Reserve(count);
+    
     for (size_t i = 0; i < count; ++i) {
         std::allocator_traits<Alloc>::construct(allocator_, data_ + i, value);
     }
+    
     size_ = count;
 }
 
 template <typename T, typename Alloc>
 Array<T, Alloc>::Array(const Array& other) : Array() {
     Reserve(other.size_);
+    
     for (size_t i = 0; i < other.size_; ++i) {
         std::allocator_traits<Alloc>::construct(allocator_, data_ + i, other.data_[i]);
     }
+    
     size_ = other.size_;
 }
 

@@ -18,12 +18,6 @@ private:
 public:
     class ForwardIterator {
     public:
-        using value_type = T;
-        using reference_type = value_type&;
-        using pointer_type = value_type*;
-        using difference_type = std::ptrdiff_t;
-        using iterator_category = std::forward_iterator_tag;
-
         explicit ForwardIterator(T* ptr) : current_(ptr) {}
 
         inline bool operator==(const ForwardIterator& other) const {
@@ -34,7 +28,7 @@ public:
             return !(*this == other);
         }
 
-        inline reference_type operator*() const {
+        inline T& operator*() const {
             return *current_;
         }
 
@@ -49,7 +43,7 @@ public:
             return tmp;
         }
 
-        inline pointer_type operator->() const {
+        inline T* operator->() const {
             return current_;
         }
 
@@ -65,9 +59,9 @@ public:
         : DynamicArray(resource) {
         if (sz > 0) {
             data_ = allocator_.allocate(sz);
-            for (size_t i = 0; i < sz; ++i) {
+            for (size_t i = 0; i < sz; ++i)
                 new (data_ + i) T();
-            }
+    
             size_ = sz;
             capacity_ = sz;
         }
@@ -104,14 +98,18 @@ public:
         if (this != &other) {
             Clear();
             if (capacity_ < other.size_) {
-                if (data_) allocator_.deallocate(data_, capacity_);
+                if (data_) 
+                    allocator_.deallocate(data_, capacity_);
+                
                 data_ = nullptr;
                 capacity_ = 0;
             }
+            
             if (other.size_ > capacity_) {
                 data_ = allocator_.allocate(other.size_);
                 capacity_ = other.size_;
             }
+            
             for (size_t i = 0; i < other.size_; ++i) {
                 new (data_ + i) T(other.data_[i]);
             }
@@ -132,6 +130,7 @@ public:
         if (IsEmpty()) {
             throw std::runtime_error("Array is empty!");
         }
+        
         data_[size_ - 1].~T();
         --size_;
     }

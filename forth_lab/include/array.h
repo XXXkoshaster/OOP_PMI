@@ -12,6 +12,12 @@
 template <typename T, typename Alloc = std::allocator<T>>
 class Array {
 public:
+    using difference_type	 = std::ptrdiff_t;
+    using value_type	= T;
+    using pointer = T*;
+    using reference = T&;
+    using iterator_category = std::forward_iterator_tag;
+    
     Array();
     Array(size_t count, const T& value);
     Array(const Array& other);

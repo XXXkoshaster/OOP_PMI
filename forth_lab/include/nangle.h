@@ -22,6 +22,8 @@ public:
 
     NAngle& operator=(const NAngle& other);
 
+    void add_vertex(const Point<T>& point);
+
     double area() const override;
     Point<T> get_barycenter() const override;
 
