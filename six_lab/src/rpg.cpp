@@ -1,221 +1,186 @@
 #include "../include/rpg.h"
 
-void ConsoleObserver::update(const std::string& event) {
-    std::cout << event << std::endl;
+std::map<NpcType, std::string> typeToString = { { NpcType::ORC, "Orc" },
+                                                 { NpcType::DRUID, "Druid" },
+                                                 { NpcType::SQUIRREL, "Squirrel" } };
+
+bool Map::add(std::unique_ptr<Npc>& npc) {
+    if(npc->getPos().x < MAP_MIN_X || npc->getPos().x > MAP_MAX_X || npc->getPos().y < MAP_MIN_Y || npc->getPos().y > MAP_MAX_Y)
+        return false;
+
+    npcs.push_back(std::move(npc));
+
+    return true;
 }
 
-FileObserver::FileObserver(const std::string& filename) {
-    logFile.open(filename, std::ios::app);
-    if (!logFile.is_open()) {
-        std::cerr << "cannot open log file: " << filename << std::endl;
+bool Map::removeNpc(const std::string& name) {
+    for (auto it = npcs.begin(); it != npcs.end(); ++it) {
+        if ((*it)->getName() == name) {
+            npcs.erase(it);
+            return true;
+        }
+    }
+    return false;
+}
+
+Npc* Map::findNpc(const std::string& name) {
+    for (auto& npc : npcs) {
+        if (npc->getName() == name)
+            return npc.get();
+    }
+    return nullptr;
+}
+
+const Npc* Map::findNpc(const std::string& name) const {
+    for (const auto& npc : npcs) {
+        if (npc->getName() == name)
+            return npc.get();
+    }
+    return nullptr;
+}
+
+std::unique_ptr<Npc> NpcFactory::create(NpcType type, const std::string& name, Point pos) const {
+    if (name.empty())
+        return nullptr;
+
+    if (pos.x < MAP_MIN_X || pos.x > MAP_MAX_X || pos.y < MAP_MIN_Y || pos.y > MAP_MAX_Y)
+        return nullptr;
+
+    if (type == NpcType::ORC)
+        return std::make_unique<Orc>(name, pos);
+    else if (type == NpcType::DRUID)
+        return std::make_unique<Druid>(name, pos);
+    else if (type == NpcType::SQUIRREL)
+        return std::make_unique<Squirrel>(name, pos);
+    
+    return nullptr;
+}
+
+void FileObserver::onEvent(const Event& e) {
+    if (auto* s = dynamic_cast<const SpawnEvent*>(&e)) {
+        log_file << "Spawned NPC:" << typeToString[s->getType()] 
+                  << " \"" << s->getName() << "\" at (" << s->getPos().x << "," << s->getPos().y << ")" << std::endl;
+
+    } else if (auto* k = dynamic_cast<const KillEvent*>(&e)) {
+        log_file << "Killed NPC:" << typeToString[k->getVictimType()] 
+                  << " \"" << k->getVictim() << "\"" << "by" << typeToString[k->getKillerType()]
+                  << " \"" << k->getKiller() << "\"" << "at (" << k->getMurderPos().x << "," << k->getMurderPos().y << ")" << std::endl;
     }
 }
-void FileObserver::update(const std::string& event) {
-    if (logFile.is_open()) {
-        logFile << event << std::endl;
+
+void ConsoleObserver::onEvent(const Event& e) {
+    if (auto* s = dynamic_cast<const SpawnEvent*>(&e)) {
+        std::cout << "Spawned NPC:" << typeToString[s->getType()] 
+                  << " \"" << s->getName() << "\" at (" << s->getPos().x << "," << s->getPos().y << ")" << std::endl;
+
+    } else if (auto* k = dynamic_cast<const KillEvent*>(&e)) {
+        std::cout << "Killed NPC:" << typeToString[k->getVictimType()] 
+                  << " \"" << k->getVictim() << "\"" << "by" << typeToString[k->getKillerType()]
+                  << " \"" << k->getKiller() << "\"" << "at (" << k->getMurderPos().x << "," << k->getMurderPos().y << ")" << std::endl;
     }
 }
-FileObserver::~FileObserver() {
-    if (logFile.is_open()) logFile.close();
+
+bool save(const Map& map, const std::string& filename) {
+    std::ofstream out(filename);
+    if (!out.is_open())
+        return false;
+
+    for (size_t i = 0; i < map.size(); ++i) {
+        const Npc* npc = map.at(i);
+        out << typeToString[npc->getType()] << " " 
+            << npc->getName() << " " 
+            << npc->getPos().x << " " 
+            << npc->getPos().y << "\n";
+    }
+
+    return true;
 }
 
-NPC::NPC(const std::string& t, const std::string& n, int px, int py)
-    : type(t), name(n), x(px), y(py), alive(true) {}
+bool load(Map& map, const std::string& filename, Publisher& bus) {
+    map.clear();
 
-std::string NPC::getType() const { return type; }
-std::string NPC::getName() const { return name; }
+    std::ifstream in(filename);
+    if (!in.is_open()) 
+        return false;
+    
+    NpcFactory factory;
+    std::string line;
 
-void NPC::print() const {
-    std::cout << type << " \"" << name << "\" at (" << x << "," << y << ")" << (isDead() ? " [DEAD]" : "") << "\n";
+    while (std::getline(in, line)) {
+        std::istringstream iss(line);
+        std::string type_str, name;
+        int x, y;
+        
+        if (!(iss >> type_str >> name >> x >> y))
+            continue;
+        
+        NpcType type;
+        if (type_str == "Orc") 
+            type = NpcType::ORC;
+        else if (type_str == "Druid") 
+            type = NpcType::DRUID;
+        else if (type_str == "Squirrel") 
+            type = NpcType::SQUIRREL;
+        else 
+            continue;
+        
+        auto npc = factory.create(type, name, {x, y});
+        if (npc) {
+            map.add(npc);
+            bus.publish(SpawnEvent(name, type, {x, y}));
+        }
+    }
+    return true;
 }
 
-double NPC::distanceTo(const NPC* other) const {
-    double dx = (double)x - (double)other->x;
-    double dy = (double)y - (double)other->y;
+double Npc::distanceTo(const Npc* other) const {
+    double dx = getPos().x - other->getPos().x;
+    double dy = getPos().y - other->getPos().y;
     return std::sqrt(dx*dx + dy*dy);
 }
 
-std::string NPC::serialize() const {
-    std::ostringstream oss;
-    oss << type << " " << name << " " << x << " " << y << (alive ? "alive" : "dead");
-    return oss.str();
-}
-
-bool NPC::inBounds(int px, int py) {
-    return px >= MAP_MIN_X && px <= MAP_MAX_X && py >= MAP_MIN_Y && py <= MAP_MAX_Y;
-}
-
-Orc::Orc(const std::string& name, int x, int y) : NPC("Orc", name, x, y) {}
-void Orc::accept(Visitor* v) { 
-    v->visit(this); 
-}
-
-Druid::Druid(const std::string& name, int x, int y) : NPC("Druid", name, x, y) {}
-void Druid::accept(Visitor* v) { 
-    v->visit(this); 
-}
-
-Squirrel::Squirrel(const std::string& name, int x, int y) : NPC("Squirrel", name, x, y) {}
-void Squirrel::accept(Visitor* v) { 
-    v->visit(this); 
-}
-
-
-FightVisitor::FightVisitor(NPC* a) : attacker(a), defender(nullptr), attackerDead(false), defenderDead(false) {}
-
-void FightVisitor::visit(Orc* d) {
-    defender = d;
-    if (attacker->getType() == "Druid") {
-    } else if (attacker->getType() == "Orc") {
-    } else if (attacker->getType() == "Squirrel") {
-    }
-}
-
-void FightVisitor::visit(Druid* d) {
-    defender = d;
-    if (attacker->getType() == "Orc") {
-        defenderDead = true;
-    } else if (attacker->getType() == "Druid") {
-    } else if (attacker->getType() == "Squirrel") {
-    }
-}
-
-void FightVisitor::visit(Squirrel* d) {
-    defender = d;
-    if (attacker->getType() == "Druid") {
-        defenderDead = true;
-    } else if (attacker->getType() == "Orc") {
-    } else if (attacker->getType() == "Squirrel") {
-    }
-}
-
-
-std::shared_ptr<NPC> NPCFactory::create(const std::string& type, const std::string& name, int x, int y) {
-    if (!NPC::inBounds(x, y)) 
-        return std::shared_ptr<NPC>();
-
-    if (type == "Orc") 
-        return std::make_shared<Orc>(name, x, y);
-
-    if (type == "Druid") 
-        return std::make_shared<Druid>(name, x, y);
-
-    if (type == "Squirrel") 
-        return std::make_shared<Squirrel>(name, x, y);
-
-    return std::shared_ptr<NPC>();
-}
-
-std::shared_ptr<NPC> NPCFactory::loadFromLine(const std::string& line) {
-    std::istringstream iss(line);
-    std::string type, name, state;
-    int x, y;
+void BattleEngine::run(Map& map) {
+    BattleRules rules;
+    std::vector<Npc*> died_npcs;
     
-    if (!(iss >> type >> name >> x >> y))
-        return std::shared_ptr<NPC>();
-    
-    auto npc = create(type, name, x, y);
-    
-    if (!npc)
-        return npc;
+    for (size_t i = 0; i < map.size(); ++i) {
+        for (size_t j = i + 1; j < map.size(); ++j) {
+            Npc* npc1 = map.at(i);
+            Npc* npc2 = map.at(j);
+            
+            if (npc1->isAlive() && npc2->isAlive() && npc1->distanceTo(npc2) <= radius_) {
+                FightVisitor atk(npc1->getType(), npc1->getName(), rules);
+                npc2->accept(atk);
 
-    if (iss >> state) {
-        if (state == "dead" || state == "0") 
-            npc->kill();
-        else 
-            npc->revive();
-    }
-
-    return npc;
-}
-
-void Arena::startBattle(std::vector<std::shared_ptr<NPC>>& npcs,
-                        double range,
-                        std::vector<std::shared_ptr<Observer>>& observers) {
-   
-    std::vector<int> alive(npcs.size(), 1);
-
-    for (size_t i = 0; i < npcs.size(); ++i) {
-        if (!alive[i]) 
-            continue;
-
-        for (size_t j = i + 1; j < npcs.size(); ++j) {
-            if (!alive[j]) 
-                continue;
-
-            NPC* a = npcs[i].get();
-            NPC* b = npcs[j].get();
-
-            if (a->distanceTo(b) > range) 
-                continue;
-
-            FightVisitor v1(a);
-            b->accept(&v1);
-
-            FightVisitor v2(b);
-            if (!v1.defenderDead && !v1.attackerDead) {
-                a->accept(&v2);
-            }
-
-            bool killA = v1.attackerDead || v2.defenderDead; 
-            bool killB = v1.defenderDead || v2.attackerDead;
-
-            if (killA && alive[i]) {
-                alive[i] = 0;
-                std::string ev = b->getName() + " killed " + a->getName();
-                for (size_t k = 0; k < observers.size(); ++k) 
-                    observers[k]->update(ev);
-            }
-            if (killB && alive[j]) {
-                alive[j] = 0;
-                std::string ev = a->getName() + " killed " + b->getName();
-                for (size_t k = 0; k < observers.size(); ++k) 
-                    observers[k]->update(ev);
+                FightResult res = atk.getResult();
+                if (res == FightResult::WIN) {
+                    npc2->kill();
+                    died_npcs.push_back(npc2);
+                    bus_.publish(KillEvent(npc1->getName(), npc2->getName(), npc1->getType(), npc2->getType(), npc2->getPos()));
+                } else if (res == FightResult::LOSE) {
+                    npc1->kill();
+                    died_npcs.push_back(npc1);
+                    bus_.publish(KillEvent(npc2->getName(), npc1->getName(), npc2->getType(), npc1->getType(), npc1->getPos()));
+                } else if (res == FightResult::DRAW) {
+                    continue;
+                }
             }
         }
     }
 
-    std::vector<std::shared_ptr<NPC>> aliveList;
-    for (size_t i = 0; i < npcs.size(); ++i) {
-        if (alive[i]) 
-            aliveList.push_back(npcs[i]);
-    }
-
-    npcs.swap(aliveList);
-}
-
-void printNPCs(const std::vector<std::shared_ptr<NPC>>& npcs) {
-    for (size_t i = 0; i < npcs.size(); ++i) {
-        npcs[i]->print();
+    for (auto npc : died_npcs) {
+        map.removeNpc(npc->getName());
     }
 }
 
-bool saveToFile(const std::vector<std::shared_ptr<NPC>>& npcs,
-                const std::string& filename) {
-    std::ofstream out(filename.c_str());
-    if (!out.is_open()) return false;
-    for (size_t i = 0; i < npcs.size(); ++i) {
-        out << npcs[i]->serialize() << "\n";
-    }
-    return true;
+void Orc::accept(Visitor& visitor) const {
+    visitor.visit(*this);
 }
 
-bool loadFromFile(std::vector<std::shared_ptr<NPC>>& out, const std::string& filename) {
-    std::ifstream in(filename);
-    if (!in.is_open()) return false;
-    std::string line;
-    while (std::getline(in, line)) {
-        std::shared_ptr<NPC> npc = NPCFactory::loadFromLine(line);
-        if (npc) 
-            out.push_back(npc);
-    }
-    return true;
+void Druid::accept(Visitor& visitor) const {
+    visitor.visit(*this);
 }
 
-bool isNameUnique(const std::vector<std::shared_ptr<NPC>>& npcs,
-                  const std::string& name) {
-    for (size_t i = 0; i < npcs.size(); ++i) {
-        if (npcs[i]->getName() == name) return false;
-    }
-    return true;
+void Squirrel::accept(Visitor& visitor) const {
+    visitor.visit(*this);
 }

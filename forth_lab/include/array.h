@@ -1,60 +1,114 @@
 #ifndef ARRAY_H
 #define ARRAY_H
 
-#include <algorithm>
-#include <cstddef>
-#include <initializer_list>
-#include <memory>
-#include <stdexcept>
-#include <type_traits>
-#include <utility>
+#include "figure.h"
 
-template <typename T, typename Alloc = std::allocator<T>>
+template<typename T>
 class Array {
-public:
-    using difference_type	 = std::ptrdiff_t;
-    using value_type	= T;
-    using pointer = T*;
-    using reference = T&;
-    using iterator_category = std::forward_iterator_tag;
+    private:
+        std::shared_ptr<T[]> data;
+        size_t capacity;
+        size_t size;
+
+        void reserve(size_t new_cap) {
+            if (new_cap <= capacity) 
+                return;
+            
+            std::shared_ptr<T[]> new_arr(new T[new_cap]);
+            for (size_t i = 0; i < size; ++i)
+                new_arr[i] = data[i];
+
+            data = new_arr;
+            capacity = new_cap;
+        }
+    public:
+        Array() : data(new T[1]), size(0), capacity(1) {}
+
+        Array(size_t capacity) : data(new T[capacity]()), size(0), capacity(capacity) {}
+
+        Array(const Array& other) {
+            size = other.size;
+            capacity = other.capacity;
+            
+            data = std::shared_ptr<T[]>(new T[capacity]);
+            for (size_t i = 0; i < size; ++i)
+                data[i] = other.data[i];
+        }
+        Array(Array&& other) 
+            : data(std::move(other.data)), size(std::exchange(other.size, 0)), capacity(std::exchange(other.capacity,0)) {}
+
+        Array& operator=(const Array& other) {
+            if (this == &other)
+                return *this;
+
+            size = other.size;
+            capacity = other.capacity;
+
+            data = std::shared_ptr<T[]>(new T[capacity]);
+            for (size_t i = 0; i < size; ++i)
+                data[i] = other.data[i];
+
+            return *this;
+        }
+        Array& operator=(Array&& other) {
+            if (this == &other)
+                return *this;
+
+            data = std::move(other.data);
+            size = std::exchange(other.size, 0);
+            capacity = std::exchange(other.capacity, 0);
+
+            return *this;           
+        }
+
+        void pushBack(const T& t) {
+            if (size == capacity)
+                reserve(capacity * 2);
+
+            data[size] = t;
+            ++size;
+        }
     
-    Array();
-    Array(size_t count, const T& value);
-    Array(const Array& other);
-    Array(Array&& other) noexcept;
-    Array(std::initializer_list<T> init);
-    ~Array();
+        void pushBack(T&& t) {
+            if (size == capacity)
+                reserve(capacity * 2);
 
-    Array& operator=(const Array& other);
-    Array& operator=(Array&& other) noexcept;
+            data[size] = std::move(t);
+            ++size;
+        }
 
-    T& operator[](size_t pos);
+        void popBack() {
+            if (size == 0)
+                return;
+            --size;
+        }
 
-    bool IsEmpty() const noexcept;
-    const T& Front() const noexcept;
-    T& Back() const noexcept;
-    T* Data() const noexcept;
-    size_t Size() const noexcept;
-    size_t Capacity() const noexcept;
+        void remove(size_t index) {
+            if (index >= size)
+                return;
 
-    void Reserve(size_t new_cap);
-    void Clear() noexcept;
-    void Insert(size_t pos, T value);
-    void Erase(size_t begin_pos, size_t end_pos);
-    void PushBack(T value);
+            for (size_t i = index; i < size - 1; ++i)
+                data[i] = std::move(data[i + 1]);
 
-    template <class... Args>
-    void EmplaceBack(Args&&... args);
+            --size;
+        }
 
-    void PopBack();
-    void Resize(size_t count, const T& value);
+        size_t getSize() const {
+            return size;
+        }
+        
+        size_t getCapacity() const {
+            return capacity;
+        }
 
-private:
-    T* data_;
-    size_t size_;
-    size_t capacity_;
-    Alloc allocator_;
-    static constexpr size_t CAPACITY = 1;
+        T& operator[](size_t index) {
+            return data[index];
+        }
+        const T& operator[](size_t index) const {
+            return data[index];
+        }
+
+        ~Array() = default;
 };
 
 #endif

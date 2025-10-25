@@ -1,65 +1,40 @@
-#include <iostream>
-#include <vector>
-#include <memory>
-#include <iomanip>
-#include <unordered_map>
-#include <functional>
-
-#include "../include/array.h"
-#include "../include/nangle.h"
-
-template <typename ShapeType>
-std::shared_ptr<Figure<double>> createShape(const std::string& shapeName) {
-    std::cout << "Enter coordinates for " << shapeName << ":\n";
-    ShapeType shape;
-
-    for (size_t j = 0; j < ShapeType::NUM_POINTS; ++j) {
-        double x, y;
-        std::cin >> x >> y;
-        shape.add_vertex(Point<double>(x, y));
-    }
-
-    return std::make_shared<ShapeType>(shape);
-}
+#include "include/array.h"
+#include "include/figure.h"
 
 int main() {
-    Array<std::shared_ptr<Figure<double>>> figures;
-
-    std::cout << "Enter number of shapes: ";
-    int shape_count;
-    std::cin >> shape_count;
-
-    std::unordered_map<int, std::function<std::shared_ptr<Figure<double>>()>> shapeCreators = {
-        {5, []() { return createShape<Pentagon<double>>("Pentagon"); }},
-        {6, []() { return createShape<Hexagon<double>>("Hexagon"); }},
-        {8, []() { return createShape<Octagon<double>>("Octagon"); }}
-    };
-
-    for (int i = 0; i < shape_count; ++i) {
-        std::cout << "Enter the type of shape (5 for Pentagon, 6 for Hexagon, 8 for Octagon): ";
-        int sides;
-        std::cin >> sides;
-
-        if (shapeCreators.find(sides) != shapeCreators.end()) {
-            figures.PushBack(shapeCreators[sides]());
-        } else {
-            std::cout << "Invalid number of sides. Please enter 5, 6, or 8." << std::endl;
-            --i;
-        }
-    }
-
-    std::cout << "\nFigures:\n";
-    double total_area = 0.0;
-    for (size_t i = 0; i < figures.Size(); ++i) {
+    Array<Figure<double>*> figures;
+    
+    figures.pushBack(new Pentagon<double>(5.0, Point<double>(0, 0)));
+    figures.pushBack(new Hexagon<double>(3.0, Point<double>(1, 1)));
+    figures.pushBack(new Octagon<double>(4.0, Point<double>(2, 2)));
+    
+    std::cout << "Total figures: " << figures.getSize() << "\n";
+    double totalArea = 0;
+    for (size_t i = 0; i < figures.getSize(); ++i) {
         std::cout << *figures[i] << "\n";
-        double area = figures[i]->area();
-        total_area += area;
-        std::cout << "Area: " << std::fixed << std::setprecision(2) << area << "\n";
-        Point<double> barycenter = figures[i]->get_barycenter();
-        std::cout << "Barycenter: " << barycenter << "\n";
+        std::cout << "Area: " << figures[i]->area() << "\n";
+        std::cout << "Center: " << figures[i]->getGeometricCenter() << "\n\n";
+        totalArea += figures[i]->area();
     }
-
-    std::cout << "\nTotal area of all figures: " << std::fixed << std::setprecision(2) << total_area << "\n";
-
+    std::cout << "Total area: " << totalArea << "\n\n";
+    
+    for (size_t i = 0; i < figures.getSize(); ++i) {
+        delete figures[i];
+    }
+    
+    Array<Pentagon<double>> pentagons;
+    
+    pentagons.pushBack(Pentagon<double>(3.0, Point<double>(0, 0)));
+    pentagons.pushBack(Pentagon<double>(5.0, Point<double>(5, 5)));
+    
+    std::cout << "Total pentagons: " << pentagons.getSize() << "\n";
+    for (size_t i = 0; i < pentagons.getSize(); ++i) {
+        std::cout << pentagons[i] << "\n";
+        std::cout << "Area: " << pentagons[i].area() << "\n\n";
+    }
+    
+    pentagons.remove(0);
+    std::cout << "After remove: " << pentagons.getSize() << " pentagons\n";
+    
     return 0;
 }

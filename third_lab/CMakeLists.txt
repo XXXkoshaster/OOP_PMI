@@ -4,10 +4,10 @@ project(FigureProject)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_library(figure_lib src/figure.cpp)
+add_library(figure_lib src/figure.cpp src/array.cpp)
 target_include_directories(figure_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-add_executable(figure_main src/main.cpp)
+add_executable(figure_main main.cpp)
 target_link_libraries(figure_main PRIVATE figure_lib)
 
 enable_testing()

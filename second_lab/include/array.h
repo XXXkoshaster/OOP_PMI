@@ -1,53 +1,47 @@
-#ifndef Decimal_H
-#define Decimal_H
-
-#include <iostream>
-#include <initializer_list>
+#include <utility>
 #include <string>
-#include <stdexcept>
-#include <cstring>
-#include <algorithm>
+#include <iostream>
 
-class Decimal 
-{
-public: 
-    Decimal();
-    Decimal(const size_t & n, unsigned char t = 0);
-    Decimal(const std::initializer_list<unsigned char> &t);
-    Decimal(const std::string &t);
-    Decimal(const Decimal& other);
-    Decimal(Decimal&& other) noexcept;
-    virtual ~Decimal() noexcept;
-    
-    Decimal& operator=(const Decimal& other);
-    Decimal& operator=(Decimal&& other) noexcept;
-    
-    Decimal& operator+=(const Decimal& other);
-    Decimal& operator-=(const Decimal& other);
-    
-    friend Decimal operator+(const Decimal &a, const Decimal &b);
-    friend Decimal operator-(const Decimal &a, const Decimal &b);
+class Decimal {
+    public:
+        Decimal();
+        Decimal(const size_t& n, unsigned char t);
+        Decimal(const std::initializer_list<unsigned char>& t);
+        Decimal(const std::string& t);
 
-    friend bool operator==(const Decimal &a, const Decimal &b);
-    friend bool operator!=(const Decimal &a, const Decimal &b);
-    friend bool operator<(const Decimal &a, const Decimal &b);
-    friend bool operator>(const Decimal &a, const Decimal &b);
-    friend bool operator<=(const Decimal &a, const Decimal &b);
-    friend bool operator>=(const Decimal &a, const Decimal &b);
+        Decimal(const Decimal& other);
+        Decimal(Decimal&& other) noexcept;
 
-    friend std::ostream &operator<<(std::ostream &os, const Decimal &num);
+        Decimal& operator=(const Decimal& other);
+        Decimal& operator=(Decimal&& other);
 
-    size_t getSize() const;
-    std::string toString() const;
+        friend Decimal operator+(Decimal lhs, const Decimal& rhs);
+        friend Decimal operator-(Decimal lhs, const Decimal& rhs);
+        Decimal& operator+=(const Decimal& rhs);
+        Decimal& operator-=(const Decimal& rhs);
 
-private:
-    bool isInvalidDigit(unsigned char c);  
-    bool isValidDecimalInitList(const std::initializer_list<unsigned char> &lst);  
-    bool isValidDecimalString(const std::string &str); 
+        friend std::istream& operator>>(std::istream& is, Decimal& obj);
+        friend std::ostream& operator<<(std::ostream& os, Decimal& obj);
 
-private:
-    size_t _sz;
-    unsigned char *_arr;
+        friend bool operator<(const Decimal& lhs, const Decimal& rhs);
+        friend bool operator>(const Decimal& lhs, const Decimal& rhs);
+        friend bool operator<=(const Decimal& lhs, const Decimal& rhs);
+        friend bool operator>=(const Decimal& lhs, const Decimal& rhs);
+        friend bool operator==(const Decimal& lhs, const Decimal& rhs);
+        friend bool operator!=(const Decimal& lhs, const Decimal& rhs);
+        
+        ~Decimal() noexcept;
+
+        size_t getSize() const;
+        std::string toString() const;
+
+    protected:
+        unsigned char* arr = nullptr;
+        size_t size;
+
+    private:
+        bool isInvalidDigit(unsigned char c);  
+        bool isValidDecimalInitList(const std::initializer_list<unsigned char> &lst);  
+        bool isValidDecimalString(const std::string &str); 
+
 };
-
-#endif

@@ -19,7 +19,7 @@ private:
     std::list<Block> blocks_;
 
 public:
-    explicit FixedBlockMemoryResource(size_t total_bytes) : buffer_(nullptr), total_(total_bytes) {
+    FixedBlockMemoryResource(size_t total_bytes) : buffer_(nullptr), total_(total_bytes) {
         buffer_ = static_cast<char*>(::operator new(total_));
         Block b;
         b.ptr = buffer_;
@@ -88,7 +88,7 @@ protected:
         throw std::bad_alloc();
     }
 
-    void do_deallocate(void* p, size_t /*bytes*/, size_t /*alignment*/) override {
+    void do_deallocate(void* p, std::size_t, std::size_t) override {
         if (!p) 
             return;
             

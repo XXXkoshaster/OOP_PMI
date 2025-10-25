@@ -1,112 +1,145 @@
 #include <gtest/gtest.h>
 #include "../include/rpg.h"
 
-TEST(NPCTest, CreateNPC) {
-    auto npc = NPCFactory::create("Orc", "Grom", 100, 200);
+TEST(FactoryTest, CreateOrc) {
+    NpcFactory factory;
+    auto npc = factory.create(NpcType::ORC, "Grom", {100, 200});
     ASSERT_NE(npc, nullptr);
-    EXPECT_EQ(npc->getType(), "Orc");
+    EXPECT_EQ(npc->getType(), NpcType::ORC);
     EXPECT_EQ(npc->getName(), "Grom");
-    EXPECT_EQ(npc->x, 100);
-    EXPECT_EQ(npc->y, 200);
+    EXPECT_EQ(npc->getPos().x, 100);
+    EXPECT_EQ(npc->getPos().y, 200);
 }
 
-TEST(NPCTest, SerializeNPC) {
-    auto npc = NPCFactory::create("Squirrel", "Nutty", 150, 250);
-    std::string serialized = npc->serialize();
-    EXPECT_EQ(serialized, "Squirrel Nutty 150 250");
-}
-
-TEST(NPCTest, DeserializeNPC) {
-    std::string data = "Druid Leaf 300 400";
-    auto npc = NPCFactory::loadFromLine(data);
+TEST(FactoryTest, CreateDruid) {
+    NpcFactory factory;
+    auto npc = factory.create(NpcType::DRUID, "Leaf", {300, 400});
     ASSERT_NE(npc, nullptr);
-    EXPECT_EQ(npc->getType(), "Druid");
-    EXPECT_EQ(npc->getName(), "Leaf");
-    EXPECT_EQ(npc->x, 300);
-    EXPECT_EQ(npc->y, 400);
+    EXPECT_EQ(npc->getType(), NpcType::DRUID);
 }
 
-TEST(NPCTest, DeserializeInvalidNPC) {
-    std::string data = "InvalidType Unknown 0 0";
-    auto npc = NPCFactory::loadFromLine(data);
+TEST(FactoryTest, CreateSquirrel) {
+    NpcFactory factory;
+    auto npc = factory.create(NpcType::SQUIRREL, "Nutty", {150, 250});
+    ASSERT_NE(npc, nullptr);
+    EXPECT_EQ(npc->getType(), NpcType::SQUIRREL);
+}
+
+TEST(FactoryTest, InvalidPosition) {
+    NpcFactory factory;
+    auto npc = factory.create(NpcType::ORC, "Test", {-10, 200});
     EXPECT_EQ(npc, nullptr);
 }
 
-TEST(NPCTest, DistanceToNPC) {
-    auto npc1 = NPCFactory::create("Orc", "Grom", 100, 200);
-    auto npc2 = NPCFactory::create("Squirrel", "Nutty", 150, 250);
-
-    double distance = npc1->distanceTo(npc2.get());
-    EXPECT_NEAR(distance, 70.7107, 0.0001);
+TEST(FactoryTest, EmptyName) {
+    NpcFactory factory;
+    auto npc = factory.create(NpcType::ORC, "", {100, 200});
+    EXPECT_EQ(npc, nullptr);
 }
 
-TEST(NPCTest, SaveAndLoadNPCsFromFile) {
-    std::vector<std::shared_ptr<NPC>> npcs;
-    npcs.push_back(NPCFactory::create("Orc", "Grom", 100, 200));
-    npcs.push_back(NPCFactory::create("Squirrel", "Nutty", 150, 250));
-
-    const std::string filename = "test_npcs.txt";
-    ASSERT_TRUE(saveToFile(npcs, filename));
-
-    std::vector<std::shared_ptr<NPC>> loadedNPCs;
-    ASSERT_TRUE(loadFromFile(loadedNPCs, filename));
-
-    ASSERT_EQ(loadedNPCs.size(), 2u);
-    EXPECT_EQ(loadedNPCs[0]->getType(), "Orc");
-    EXPECT_EQ(loadedNPCs[1]->getType(), "Squirrel");
+TEST(MapTest, AddNpc) {
+    Map map;
+    NpcFactory factory;
+    auto npc = factory.create(NpcType::ORC, "Grom", {100, 200});
+    EXPECT_TRUE(map.add(npc));
+    EXPECT_EQ(map.size(), 1u);
 }
+
+TEST(MapTest, FindNpc) {
+    Map map;
+    NpcFactory factory;
+    auto npc = factory.create(NpcType::ORC, "Grom", {100, 200});
+    map.add(npc);
+    EXPECT_NE(map.findNpc("Grom"), nullptr);
+    EXPECT_EQ(map.findNpc("Unknown"), nullptr);
+}
+
+TEST(MapTest, RemoveNpc) {
+    Map map;
+    NpcFactory factory;
+    auto npc = factory.create(NpcType::ORC, "Grom", {100, 200});
+    map.add(npc);
+    EXPECT_TRUE(map.removeNpc("Grom"));
+    EXPECT_EQ(map.size(), 0u);
+}
+
+TEST(NpcTest, Distance) {
+    NpcFactory factory;
+    auto npc1 = factory.create(NpcType::ORC, "Grom", {0, 0});
+    auto npc2 = factory.create(NpcType::DRUID, "Leaf", {3, 4});
+    EXPECT_DOUBLE_EQ(npc1->distanceTo(npc2.get()), 5.0);
+}
+
+TEST(BattleRulesTest, OrcKillsDruid) {
+    BattleRules rules;
+    EXPECT_EQ(rules.result(NpcType::ORC, NpcType::DRUID), FightResult::WIN);
+}
+
+TEST(BattleRulesTest, DruidKillsSquirrel) {
+    BattleRules rules;
+    EXPECT_EQ(rules.result(NpcType::DRUID, NpcType::SQUIRREL), FightResult::WIN);
+}
+
+TEST(BattleRulesTest, DruidLosesToOrc) {
+    BattleRules rules;
+    EXPECT_EQ(rules.result(NpcType::DRUID, NpcType::ORC), FightResult::LOSE);
+}
+
+TEST(BattleRulesTest, SquirrelLosesToDruid) {
+    BattleRules rules;
+    EXPECT_EQ(rules.result(NpcType::SQUIRREL, NpcType::DRUID), FightResult::LOSE);
+}
+
+TEST(BattleRulesTest, SameTypeDraw) {
+    BattleRules rules;
+    EXPECT_EQ(rules.result(NpcType::ORC, NpcType::ORC), FightResult::DRAW);
+}
+
+TEST(BattleEngineTest, OrcKillsDruid) {
+    Map map;
+    Publisher bus;
+    NpcFactory factory;
+    auto orc = factory.create(NpcType::ORC, "Grom", {100, 100});
+    auto druid = factory.create(NpcType::DRUID, "Leaf", {105, 105});
+    map.add(orc);
+    map.add(druid);
     
-TEST(ArenaTest, OrcKillsDruid) {
-    auto orc = NPCFactory::create("Orc", "Grom", 100, 200);
-    auto druid = NPCFactory::create("Druid", "Leaf", 150, 250);
-    std::vector<std::shared_ptr<NPC>> npcs = { orc, druid };
-
-    std::vector<std::shared_ptr<Observer>> observers;
-    observers.push_back(std::make_shared<ConsoleObserver>()); 
+    BattleEngine engine(10, bus);
+    engine.run(map);
     
-    testing::internal::CaptureStdout();
-    Arena arena;
-    arena.startBattle(npcs, 1000.0, observers); 
-    std::string output = testing::internal::GetCapturedStdout();
-
-    EXPECT_NE(output.find("Grom killed Leaf"), std::string::npos);
-    ASSERT_EQ(npcs.size(), 1u);
-    EXPECT_EQ(npcs[0]->getName(), "Grom");
+    EXPECT_EQ(map.size(), 1u);
+    EXPECT_EQ(map.at(0)->getName(), "Grom");
 }
 
-TEST(ArenaTest, DruidKillsSquirrel) {
-    auto druid = NPCFactory::create("Druid", "Leaf", 200, 200);
-    auto squirrel = NPCFactory::create("Squirrel", "Nutty", 210, 210);
-    std::vector<std::shared_ptr<NPC>> npcs = { druid, squirrel };
-
-    std::vector<std::shared_ptr<Observer>> observers;
-    observers.push_back(std::make_shared<ConsoleObserver>());
-
-    testing::internal::CaptureStdout();
-    Arena arena;
-    arena.startBattle(npcs, 50.0, observers);
-    std::string output = testing::internal::GetCapturedStdout();
-
-    EXPECT_NE(output.find("Leaf killed Nutty"), std::string::npos);
-    ASSERT_EQ(npcs.size(), 1u);
-    EXPECT_EQ(npcs[0]->getType(), "Druid");
+TEST(BattleEngineTest, OutOfRange) {
+    Map map;
+    Publisher bus;
+    NpcFactory factory;
+    auto orc = factory.create(NpcType::ORC, "Grom", {100, 100});
+    auto druid = factory.create(NpcType::DRUID, "Leaf", {200, 200});
+    map.add(orc);
+    map.add(druid);
+    
+    BattleEngine engine(10, bus);
+    engine.run(map);
+    
+    EXPECT_EQ(map.size(), 2u);
 }
 
-TEST(ArenaTest, SquirrelsArePeaceful) {
-    auto s1 = NPCFactory::create("Squirrel", "Nutty1", 100, 100);
-    auto s2 = NPCFactory::create("Squirrel", "Nutty2", 105, 105);
-    std::vector<std::shared_ptr<NPC>> npcs = { s1, s2 };
-
-    std::vector<std::shared_ptr<Observer>> observers;
-    observers.push_back(std::make_shared<ConsoleObserver>());
-
-    testing::internal::CaptureStdout();
-    Arena arena;
-    arena.startBattle(npcs, 20.0, observers);
-    std::string output = testing::internal::GetCapturedStdout();
-
-    EXPECT_EQ(output.find("killed"), std::string::npos);
-    ASSERT_EQ(npcs.size(), 2u);
+TEST(FileTest, SaveAndLoad) {
+    Map map;
+    Publisher bus;
+    NpcFactory factory;
+    auto npc1 = factory.create(NpcType::ORC, "Grom", {100, 200});
+    auto npc2 = factory.create(NpcType::SQUIRREL, "Nutty", {150, 250});
+    map.add(npc1);
+    map.add(npc2);
+    
+    ASSERT_TRUE(save(map, "test.txt"));
+    
+    Map loaded_map;
+    ASSERT_TRUE(load(loaded_map, "test.txt", bus));
+    EXPECT_EQ(loaded_map.size(), 2u);
 }
 
 int main(int argc, char **argv) {

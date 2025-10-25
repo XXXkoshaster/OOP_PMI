@@ -1,178 +1,161 @@
-#include <thread>
-#include <future>
-#include <iterator>
-#include <string>
 #include <gtest/gtest.h>
-
+#include <string>
 #include "allocator.cpp"
 #include "array.cpp"
 
-class ArrayTest : public testing::Test {
-protected:
-    void SetUp() override {
-        for (int i = 1; i <= 7; ++i) {
-            arr.PushBack(i);
-        }
-        assert(arr.Size() == sz);
+TEST(VectorTest, DefaultConstructor) {
+    Vector<int> v;
+    ASSERT_TRUE(v.isEmpty());
+    ASSERT_EQ(v.getSize(), 0u);
+}
+
+TEST(VectorTest, PushBackInt) {
+    Vector<int> v;
+    v.pushBack(10);
+    v.pushBack(20);
+    v.pushBack(30);
+    
+    ASSERT_EQ(v.getSize(), 3u);
+    ASSERT_EQ(v[0], 10);
+    ASSERT_EQ(v[1], 20);
+    ASSERT_EQ(v[2], 30);
+}
+
+TEST(VectorTest, PopBack) {
+    Vector<int> v;
+    v.pushBack(1);
+    v.pushBack(2);
+    v.popBack();
+    
+    ASSERT_EQ(v.getSize(), 1u);
+    ASSERT_EQ(v[0], 1);
+}
+
+TEST(VectorTest, PopBackEmpty) {
+    Vector<int> v;
+    ASSERT_THROW(v.popBack(), std::runtime_error);
+}
+
+TEST(VectorTest, SizeConstructor) {
+    Vector<int> v(5);
+    ASSERT_EQ(v.getSize(), 5u);
+}
+
+TEST(VectorTest, CopyConstructor) {
+    Vector<int> v1;
+    v1.pushBack(1);
+    v1.pushBack(2);
+    
+    Vector<int> v2(v1);
+    ASSERT_EQ(v2.getSize(), 2u);
+    ASSERT_EQ(v2[0], 1);
+    ASSERT_EQ(v2[1], 2);
+}
+
+TEST(VectorTest, CopyAssignment) {
+    Vector<int> v1;
+    v1.pushBack(1);
+    v1.pushBack(2);
+    
+    Vector<int> v2;
+    v2 = v1;
+    ASSERT_EQ(v2.getSize(), 2u);
+    ASSERT_EQ(v2[0], 1);
+    ASSERT_EQ(v2[1], 2);
+}
+
+TEST(VectorTest, At) {
+    Vector<int> v;
+    v.pushBack(10);
+    v.pushBack(20);
+    
+    ASSERT_EQ(v.at(0), 10);
+    ASSERT_EQ(v.at(1), 20);
+    ASSERT_THROW(v.at(2), std::out_of_range);
+}
+
+TEST(VectorTest, Clear) {
+    Vector<int> v;
+    v.pushBack(1);
+    v.pushBack(2);
+    v.clear();
+    
+    ASSERT_TRUE(v.isEmpty());
+    ASSERT_EQ(v.getSize(), 0u);
+}
+
+TEST(VectorTest, Iterator) {
+    Vector<int> v;
+    v.pushBack(1);
+    v.pushBack(2);
+    v.pushBack(3);
+    
+    int expected = 1;
+    for (auto it = v.begin(); it != v.end(); ++it) {
+        ASSERT_EQ(*it, expected++);
     }
-    DynamicArray<int> arr;
-    const size_t sz = 7;
+}
+
+TEST(VectorTest, WithString) {
+    Vector<std::string> v;
+    v.pushBack("hello");
+    v.pushBack("world");
+    
+    ASSERT_EQ(v.getSize(), 2u);
+    ASSERT_EQ(v[0], "hello");
+    ASSERT_EQ(v[1], "world");
+}
+
+TEST(AllocatorTest, FixedBlockMemoryResource) {
+    FixedBlockMemoryResource resource(4096);
+    Vector<int> v(&resource);
+    
+    v.pushBack(100);
+    v.pushBack(200);
+    v.pushBack(300);
+    
+    ASSERT_EQ(v.getSize(), 3u);
+    ASSERT_EQ(v[0], 100);
+    ASSERT_EQ(v[1], 200);
+    ASSERT_EQ(v[2], 300);
+}
+
+TEST(AllocatorTest, MultipleAllocations) {
+    FixedBlockMemoryResource resource(1024);
+    Vector<int> v1(&resource);
+    Vector<int> v2(&resource);
+    
+    for (int i = 0; i < 10; ++i) {
+        v1.pushBack(i);
+        v2.pushBack(i * 10);
+    }
+    
+    ASSERT_EQ(v1.getSize(), 10u);
+    ASSERT_EQ(v2.getSize(), 10u);
+}
+
+struct ComplexType {
+    int id;
+    std::string name;
+    double value;
+    
+    ComplexType() : id(0), name(""), value(0.0) {}
+    ComplexType(int i, const std::string& n, double v) : id(i), name(n), value(v) {}
 };
 
-TEST(EmptyArrayTest, DefaultConstructor) {
-    DynamicArray<int> a;
-    ASSERT_TRUE(a.IsEmpty()) << "Default array isn't empty!";
-}
-
-TEST(EmptyArrayTest, PushBackSimple) {
-    DynamicArray<int> a;
-    a.PushBack(2);
-    ASSERT_EQ(a.Size(), 1u);
-    ASSERT_EQ(a[0], 2);
-}
-
-TEST(EmptyArrayTest, PopBackSimple) {
-    DynamicArray<int> a;
-    a.PushBack(1);
-    a.PushBack(2);
-    a.PopBack();
-
-    ASSERT_EQ(a.Size(), 1u);
-    ASSERT_EQ(a[0], 1);
-}
-
-TEST(EmptyArrayTest, ConstructorSizeDefaultValues) {
-    DynamicArray<std::string> a(5);
-    ASSERT_EQ(a.Size(), 5u);
-    while (a.Size()) {
-        ASSERT_TRUE(a[a.Size() - 1].empty());
-        a.PopBack();
-    }
-}
-
-TEST(EmptyArrayTest, ConstructorWithInitList) {
-    DynamicArray<int> a{1,2,3,4,5,6,7,8};
-    ASSERT_EQ(a.Size(), 8u);
-    for (int i = 0; i < 8; ++i) {
-        ASSERT_EQ(a[i], i + 1);
-    }
-}
-
-TEST(EmptyArrayTest, Swap) {
-    DynamicArray<int> a;
-    a.PushBack(5);
-
-    DynamicArray<int> b;
-    b.PushBack(14);
-    b.PushBack(15);
-
-    size_t old_a_size = a.Size();
-    size_t old_b_size = b.Size();
-
-    std::swap(a, b);
-
-    ASSERT_EQ(b.Size(), old_a_size);
-    ASSERT_EQ(a.Size(), old_b_size);
-
-    ASSERT_EQ(b[0], 5);
-    ASSERT_EQ(a[0], 14);
-    a.PopBack();
-    ASSERT_EQ(a[0], 14); // после PopBack из [14,15] останется 14
-}
-
-TEST_F(ArrayTest, CopyConstructor) {
-    DynamicArray<int> b = arr;
-    ASSERT_NE(&arr, &b) << "Copy constructor must do copy!\n";
-    ASSERT_EQ(arr.Size(), b.Size());
-    for (size_t i = 0; i < b.Size(); ++i) {
-        ASSERT_EQ(arr[i], b[i]);
-    }
-}
-
-TEST_F(ArrayTest, CopyAssignment) {
-    DynamicArray<int> b;
-    b.PushBack(4);
-    arr = b;
-    ASSERT_NE(&arr, &b) << "Copy assignment must do copy!\n";
-    ASSERT_EQ(arr.Size(), b.Size());
-    for (size_t i = 0; i < b.Size(); ++i) {
-        ASSERT_EQ(arr[i], b[i]);
-    }
-}
-
-TEST_F(ArrayTest, SelfAssignment) {
-    std::thread thread([&](){
-        arr = arr;
-    });
-    auto future = std::async(std::launch::async, &std::thread::join, &thread);
-    ASSERT_LT(
-        future.wait_for(std::chrono::seconds(1)),
-        std::future_status::timeout
-    ) << "There is infinity loop!\n";
-}
-
-TEST_F(ArrayTest, RangeWithIteratorPreFix) {
-    ASSERT_EQ(arr.Size(), static_cast<std::ptrdiff_t>(sz))
-        << "Distance between begin and end iterators isn't equal to size";
-    int expected = 1;
-    for (auto it = arr.Begin(); it != arr.End(); ++it) {
-        ASSERT_EQ(*it, expected++);
-    }
-}
-
-TEST_F(ArrayTest, RangeWithIteratorPostFix) {
-    ASSERT_EQ(arr.Size(), static_cast<std::ptrdiff_t>(sz))
-        << "Distance between begin and end iterators isn't equal to size";
-    int expected = 1;
-    for (auto it = arr.Begin(); it != arr.End(); it++) {
-        ASSERT_EQ(*it, expected++);
-    }
-}
-
-TEST_F(ArrayTest, ReserveKeepsDataAndSize) {
-    for (size_t i = 0; i < arr.Size(); ++i) arr[i] *= 10;
-    size_t old_size = arr.Size();
-    size_t old_cap = arr.Capacity();
-    arr.Reserve(old_cap + 50);
-    ASSERT_EQ(arr.Size(), old_size);
-    ASSERT_GE(arr.Capacity(), old_cap + 50);
-    int expected = 10;
-    for (auto it = arr.Begin(); it != arr.End(); ++it) {
-        ASSERT_EQ(*it, expected);
-        expected += 10;
-    }
-}
-
-TEST_F(ArrayTest, Clear) {
-    arr.Clear();
-    ASSERT_TRUE(arr.IsEmpty());
-    ASSERT_EQ(arr.Size(), 0u);
-}
-
-TEST(CustomAllocatorTest, WorksWithFixedBlockMemoryResource) {
-    FixedBlockMemoryResource mem(1024 * 1024);
-    std::pmr::polymorphic_allocator<int> alloc(&mem);
-    DynamicArray<int, std::pmr::polymorphic_allocator<int>> a(alloc);
-
-    a.PushBack(100);
-    a.PushBack(200);
-    a.PushBack(300);
-
-    ASSERT_EQ(a.Size(), 3u);
-    ASSERT_EQ(a[0], 100);
-    ASSERT_EQ(a[1], 200);
-    ASSERT_EQ(a[2], 300);
-
-    a.PopBack();
-    ASSERT_EQ(a.Size(), 2u);
-    ASSERT_EQ(a[1], 200);
-}
-
-TEST(BoundsTest, AtThrows) {
-    DynamicArray<int> a{1,2,3};
-    ASSERT_NO_THROW(a.At(0));
-    ASSERT_NO_THROW(a.At(2));
-    ASSERT_THROW(a.At(3), std::out_of_range);
+TEST(VectorTest, ComplexType) {
+    FixedBlockMemoryResource resource(4096);
+    Vector<ComplexType> v(&resource);
+    
+    v.pushBack(ComplexType(1, "Alice", 3.14));
+    v.pushBack(ComplexType(2, "Bob", 2.71));
+    
+    ASSERT_EQ(v.getSize(), 2u);
+    ASSERT_EQ(v[0].id, 1);
+    ASSERT_EQ(v[0].name, "Alice");
+    ASSERT_EQ(v[0].value, 3.14);
+    ASSERT_EQ(v[1].id, 2);
+    ASSERT_EQ(v[1].name, "Bob");
 }
 
 int main(int argc, char **argv) {

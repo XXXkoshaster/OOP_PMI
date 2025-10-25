@@ -1,75 +1,109 @@
-#include <utility>
-#include <ostream>
-#include <istream>
+#include <sstream>
+#include <iostream>
+#include <cmath>
+
+struct Point {
+    double x{0.0}, y{0.0};
+
+    bool operator==(const Point& other) const {
+        return x == other.x && y == other.y;
+    }
+};
+
 
 class Figure {
-public:
-    virtual ~Figure() = default;
+    public:
+        virtual ~Figure() = default;
 
-    virtual std::pair<double, double> GeometricCenter() const = 0;
-    virtual void Print(std::ostream& os) const = 0;
-    virtual void Read(std::istream& is) = 0;
-    virtual double Area() const = 0;
-    virtual double GetRadius() const = 0;
+        virtual Point geometricCenter() const = 0;
+        virtual double area() const = 0;
+        virtual void print(std::ostream& os) const = 0;
+        virtual void read(std::istream& is) = 0;
 
-    virtual bool operator==(const Figure& other) const = 0;
-    virtual Figure& operator=(const Figure& other) = 0;
-    virtual Figure& operator=(Figure&& other) noexcept = 0;
+        virtual bool operator==(const Figure& other) const = 0;
+        virtual Figure& operator=(const Figure& other) = 0;
+        virtual Figure& operator=(Figure&& other)  = 0;
 
-    friend std::ostream& operator<<(std::ostream& os, const Figure& fig) {
-        fig.Print(os);
-        return os;
-    }
+        friend std::ostream& operator<<(std::ostream& os, const Figure& f) {
+            f.print(os);
+            return os;
+        }
 
-    friend std::istream& operator>>(std::istream& is, Figure& fig) {
-        fig.Read(is);
-        return is;
-    }
+        friend std::istream& operator>>(std::istream& is, Figure& f) {
+            f.read(is);
+            return is;
+        }
 
-    operator double() const {
-        return Area();
-    }
+        operator double() const {
+            return area();
+        }
 };
 
-class RegularPolygon : public Figure {
-protected:
-    std::pair<double, double> center;  
-    double radius;                     
-    int sides;                         
+class RegularFigure : public Figure {
+    private:
+        double radius;
+        int sides;
+        Point center;
+    public:
+        RegularFigure(double radius, int sides, Point center = Point{}) 
+            : radius(radius), sides(sides), center(center) {};
+        
+        RegularFigure(const RegularFigure& other)
+            : radius(other.radius), sides(other.sides), center(other.center) {};
+        
+        RegularFigure (RegularFigure&& other)
+            : radius(std::exchange(other.radius, 0.0)),
+              sides(std::exchange(other.sides, 0)),
+              center(std::exchange(other.center, Point{})) {};
 
-public:
-    RegularPolygon(int sides = 3, double radius = 1.0, std::pair<double, double> center = {0, 0});
-    RegularPolygon(const RegularPolygon& other); 
-    RegularPolygon(RegularPolygon&& other) noexcept;
-    std::pair<double, double> GeometricCenter() const override;
-    void Print(std::ostream& os) const override;
-    void Read(std::istream& is) override;
-    double Area() const override;
-    double GetRadius() const override;
+        Figure& operator=(const Figure& other) override;
 
-    bool operator==(const Figure& other) const override;
-    Figure& operator=(const Figure& other) override;
-    Figure& operator=(Figure&& other) noexcept override; 
+        Figure& operator=(Figure&& other) override;
+
+        bool operator==(const Figure& other) const override;
+        
+        Point geometricCenter() const override {
+            return center;
+        }
+
+        double area() const override;
+
+        void read(std::istream& is) override;
+        void print(std::ostream& os) const override;
 };
 
-class Pentagon : public RegularPolygon {
-public:
-    Pentagon(double radius = 1.0);
-    Pentagon(const Pentagon& other); 
-    Pentagon(Pentagon&& other) noexcept; 
+class Pentagon : public RegularFigure {
+    public:
+        Pentagon(double radius, Point center = {})
+            : RegularFigure(radius, 5, center) {};
+
+        Pentagon(const Pentagon& other)
+            : RegularFigure(other) {};
+
+        Pentagon(Pentagon&& other)
+            : RegularFigure(std::move(other)) {};
 };
 
+class Hexagon : public RegularFigure {
+    public:
+        Hexagon(double radius, Point center = {})
+            : RegularFigure(radius, 6, center) {};
 
-class Hexagon : public RegularPolygon {
-public:
-    Hexagon(double radius = 1.0);
-    Hexagon(const Hexagon& other); 
-    Hexagon(Hexagon&& other) noexcept; 
+        Hexagon(const Hexagon& other)
+            : RegularFigure(other) {};
+
+        Hexagon(Hexagon&& other)
+            : RegularFigure(std::move(other)) {};
 };
 
-class Octagon : public RegularPolygon {
-public:
-    Octagon(double radius = 1.0); 
-    Octagon(const Octagon& other); 
-    Octagon(Octagon&& other) noexcept; 
+class Octagon : public RegularFigure {
+    public:
+        Octagon(double radius, Point center = {})
+            : RegularFigure(radius, 8, center) {};
+
+        Octagon(const Octagon& other)
+            : RegularFigure(other) {};
+
+        Octagon(Octagon&& other)
+            : RegularFigure(std::move(other)) {};
 };

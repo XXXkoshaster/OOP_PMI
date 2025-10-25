@@ -1,49 +1,37 @@
 #include <gtest/gtest.h>
-#include "../include/nangle.h"
-#include "../include/array.h"
+#include "include/array.h"
+#include "include/figure.h"
 
-TEST(ArrayTest, ReserveMemory) {
+TEST(ArrayTest, PushBackAndSize) {
     Array<int> arr;
-    arr.Reserve(10);
-    EXPECT_EQ(arr.Capacity(), 10);
-    EXPECT_EQ(arr.Size(), 0);
-}
-
-TEST(ArrayTest, PushBackAndResize) {
-    Array<int> arr;
-    for (int i = 0; i < 10; ++i) {
-        arr.PushBack(i);
-    }
-    EXPECT_EQ(arr.Size(), 10);
-    for (int i = 0; i < 10; ++i) {
-        EXPECT_EQ(arr[i], i);
-    }
-}
-
-TEST(ArrayTest, InsertAtBeginning) {
-    Array<int> arr;
-    arr.PushBack(2);
-    arr.PushBack(3);
-    arr.Insert(0, 1);
-    EXPECT_EQ(arr.Size(), 3);
+    arr.pushBack(1);
+    arr.pushBack(2);
+    arr.pushBack(3);
+    EXPECT_EQ(arr.getSize(), 3);
     EXPECT_EQ(arr[0], 1);
     EXPECT_EQ(arr[1], 2);
     EXPECT_EQ(arr[2], 3);
 }
 
-TEST(ArrayTest, EraseElements) {
-    Array<int> arr{1, 2, 3, 4, 5};
-    arr.Erase(1, 4);
-    EXPECT_EQ(arr.Size(), 2);
+TEST(ArrayTest, RemoveElement) {
+    Array<int> arr;
+    arr.pushBack(1);
+    arr.pushBack(2);
+    arr.pushBack(3);
+    arr.remove(1);
+    EXPECT_EQ(arr.getSize(), 2);
     EXPECT_EQ(arr[0], 1);
-    EXPECT_EQ(arr[1], 5);
+    EXPECT_EQ(arr[1], 3);
 }
 
-TEST(ArrayTest, ClearArray) {
-    Array<int> arr{1, 2, 3};
-    arr.Clear();
-    EXPECT_TRUE(arr.IsEmpty());
-    EXPECT_EQ(arr.Size(), 0);
+TEST(ArrayTest, CopyConstructor) {
+    Array<int> arr1;
+    arr1.pushBack(1);
+    arr1.pushBack(2);
+    Array<int> arr2(arr1);
+    EXPECT_EQ(arr2.getSize(), 2);
+    EXPECT_EQ(arr2[0], 1);
+    EXPECT_EQ(arr2[1], 2);
 }
 
 TEST(PointTest, EqualityOperator) {
@@ -54,31 +42,71 @@ TEST(PointTest, EqualityOperator) {
     EXPECT_FALSE(p1 == p3);
 }
 
-TEST(FigureTest, FigureCopyAssignment) {
-    NAngle<int, 3> fig1{{0, 0}, {1, 1}, {2, 0}};
-    NAngle<int, 3> fig2;
-    fig2 = fig1;
-    EXPECT_EQ(fig2.get_size(), fig1.get_size());
-    EXPECT_EQ(fig2.get_barycenter().get_x(), fig1.get_barycenter().get_x());
+TEST(PointTest, Getters) {
+    Point<double> p(3.5, 4.5);
+    EXPECT_DOUBLE_EQ(p.get_x(), 3.5);
+    EXPECT_DOUBLE_EQ(p.get_y(), 4.5);
 }
 
-
-TEST(PentagonTest, PentagonInitializationAndArea) {
-    Pentagon<double> pentagon{{0, 0}, {5, 0}, {6, 4}, {3, 5}, {0, 4}};
-    EXPECT_NEAR(pentagon.area(), 43.011, 0.001);
+TEST(PentagonTest, AreaCalculation) {
+    Pentagon<double> pentagon(5.0, Point<double>(0, 0));
+    double expected = (5 * 5.0 * 5.0 * std::sin((2 * M_PI) / 5)) / 2;
+    EXPECT_NEAR(pentagon.area(), expected, 0.001);
 }
 
-TEST(HexagonTest, HexagonBarycenter) {
-    Hexagon<double> hexagon{{0, 0}, {2, 0}, {3, 2}, {2, 4}, {0, 4}, {-1, 2}};
-    Point<double> barycenter = hexagon.get_barycenter();
-    EXPECT_DOUBLE_EQ(barycenter.get_x(), 1.0);
-    EXPECT_DOUBLE_EQ(barycenter.get_y(), 2.0);
+TEST(PentagonTest, GeometricCenter) {
+    Pentagon<double> pentagon(5.0, Point<double>(3, 4));
+    Point<double> center = pentagon.getGeometricCenter();
+    EXPECT_DOUBLE_EQ(center.get_x(), 3.0);
+    EXPECT_DOUBLE_EQ(center.get_y(), 4.0);
 }
 
-TEST(ArrayTest, InsertOutOfBounds) {
-    Array<int> arr{1, 2, 3};
-    EXPECT_NO_THROW(arr.Insert(0, 0));
-    EXPECT_THROW(arr.Insert(5, 10), std::out_of_range);
+TEST(HexagonTest, AreaCalculation) {
+    Hexagon<double> hexagon(3.0, Point<double>(0, 0));
+    double expected = (6 * 3.0 * 3.0 * std::sin((2 * M_PI) / 6)) / 2;
+    EXPECT_NEAR(hexagon.area(), expected, 0.001);
+}
+
+TEST(OctagonTest, AreaCalculation) {
+    Octagon<double> octagon(4.0, Point<double>(0, 0));
+    double expected = (8 * 4.0 * 4.0 * std::sin((2 * M_PI) / 8)) / 2;
+    EXPECT_NEAR(octagon.area(), expected, 0.001);
+}
+
+TEST(FigureTest, CopyAssignment) {
+    Pentagon<double> p1(5.0, Point<double>(0, 0));
+    Pentagon<double> p2(3.0, Point<double>(1, 1));
+    p2 = p1;
+    EXPECT_DOUBLE_EQ(p2.area(), p1.area());
+    EXPECT_EQ(p2.getGeometricCenter().get_x(), p1.getGeometricCenter().get_x());
+}
+
+TEST(FigureTest, MoveAssignment) {
+    Pentagon<double> p1(5.0, Point<double>(0, 0));
+    double area = p1.area();
+    Pentagon<double> p2(3.0, Point<double>(1, 1));
+    p2 = std::move(p1);
+    EXPECT_NEAR(p2.area(), area, 0.001);
+}
+
+TEST(ArrayTest, ArrayOfFigurePointers) {
+    Array<Figure<double>*> figures;
+    figures.pushBack(new Pentagon<double>(5.0, Point<double>(0, 0)));
+    figures.pushBack(new Hexagon<double>(3.0, Point<double>(1, 1)));
+    EXPECT_EQ(figures.getSize(), 2);
+    EXPECT_GT(figures[0]->area(), 0);
+    EXPECT_GT(figures[1]->area(), 0);
+    delete figures[0];
+    delete figures[1];
+}
+
+TEST(ArrayTest, ArrayOfPentagons) {
+    Array<Pentagon<double>> pentagons;
+    pentagons.pushBack(Pentagon<double>(3.0, Point<double>(0, 0)));
+    pentagons.pushBack(Pentagon<double>(5.0, Point<double>(5, 5)));
+    EXPECT_EQ(pentagons.getSize(), 2);
+    pentagons.remove(0);
+    EXPECT_EQ(pentagons.getSize(), 1);
 }
 
 int main(int argc, char **argv) {

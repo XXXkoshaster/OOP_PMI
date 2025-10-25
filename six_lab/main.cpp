@@ -1,47 +1,103 @@
 #include "include/rpg.h"
 
+extern std::map<NpcType, std::string> typeToString;
+
+void add_npc(NpcType type, std::string name, Point pos, Map& map, Publisher& bus) {
+    NpcFactory factory;
+    std::unique_ptr<Npc> npc = factory.create(type, name, pos);
+    if (!npc)
+        std::cout << "Factory returned nullptr" << std::endl;
+        
+    if(map.add(npc))
+        bus.publish(SpawnEvent(name, type, {pos.x, pos.y}));
+}
+
+void print_list(Map& map) {
+    for (size_t i = 0; i < map.size(); ++i) {
+        Npc* npc = map.at(i);
+        if (npc) {
+            std::cout << i << ") " << typeToString[npc->getType()] << " \"" << npc->getName() 
+                << "\" at (" << npc->getPos().x << "," << npc->getPos().y << ") " 
+                << (npc->isAlive() ? "alive" : "dead") << std::endl;
+        } else {
+            std::cout << i << ") empty" << std::endl;
+        }
+    }
+}
+
+void save_map(Map& map, const std::string& filename) {
+    save(map, filename);
+}
+
+void load_map(Map& map, const std::string& filename, Publisher& bus) {
+    load(map, filename, bus);
+}
+
+void run_battle(Map& map, int r, Publisher& bus) {
+    if (r > 0) {
+        BattleEngine battle{r, bus};
+        battle.run(map);
+    }
+}
+
 int main() {
-    std::vector<std::shared_ptr<NPC>> npcs;
-    std::vector<std::shared_ptr<Observer>> observers;
+    Publisher bus;
+    ConsoleObserver con;
+    FileObserver file("log.txt");
 
-    observers.push_back(std::make_shared<ConsoleObserver>());
-    observers.push_back(std::make_shared<FileObserver>("log.txt"));
+    bus.subscribe(&con);
+    bus.subscribe(&file);
+    Map world;
+    std::string line;
 
-    std::shared_ptr<NPC> a = NPCFactory::create("Orc", "Grom", 100, 200);
-    std::shared_ptr<NPC> b = NPCFactory::create("Druid", "Leaf", 150, 220);
-    std::shared_ptr<NPC> c = NPCFactory::create("Squirrel", "Nutty", 200, 250);
+    while (std::getline(std::cin, line)) {
+        std::istringstream iss(line);
+        std::string cmd;
+        iss >> cmd;
 
-    if (a && isNameUnique(npcs, a->getName())) 
-        npcs.push_back(a);
+        if (cmd == "add") {
+            std::string type_str, name;
+            int x, y;
+            iss >> type_str >> name >> x >> y;
+            NpcType type;
 
-    if (b && isNameUnique(npcs, b->getName())) 
-        npcs.push_back(b);
+            if (type_str == "Orc") 
+                type = NpcType::ORC;
+            else if (type_str == "Druid") 
+                type = NpcType::DRUID;
+            else if (type_str == "Squirrel") 
+                type = NpcType::SQUIRREL;
+            else { 
+                std::cout << "Unknown type\n";
+                continue; 
+            }
 
-    if (c && isNameUnique(npcs, c->getName())) 
-        npcs.push_back(c);
-
-    std::cout << "Created NPCs:\n";
-    printNPCs(npcs);
-
-    if (!saveToFile(npcs, "npcs.txt")) {
-        std::cerr << "Failed to save npcs.txt\n";
-    }
-
-    std::vector<std::shared_ptr<NPC>> loadedNPCs;
-    if (!loadFromFile(loadedNPCs, "npcs.txt")) {
-        std::cerr << "Failed to load npcs.txt\n";
-    }
-
-    std::cout << "\nLoaded NPCs from file:\n";
-    printNPCs(loadedNPCs);
-
-    Arena arena;
-    double range = 120.0;
-    std::cout << "\nBattle Begins on Arena (range=" << range << "):\n";
-    arena.startBattle(loadedNPCs, range, observers);
-
-    std::cout << "\nSurvivors:\n";
-    printNPCs(loadedNPCs);
-
+            add_npc(type, name, {x, y}, world, bus);
+        }
+        else if (cmd == "list") {
+            print_list(world);
+        }
+        else if (cmd == "save") {
+            std::string filename;
+            iss >> filename;
+            save_map(world, filename);
+        }
+        else if (cmd == "load") {
+            std::string filename;
+            iss >> filename;
+            load_map(world, filename, bus);
+        }
+        else if (cmd == "battle") {
+            int radius;
+            iss >> radius;
+            run_battle(world, radius, bus);
+        }
+        else if (cmd == "exit") {
+            break;
+        }
+        else {
+            std::cout << "Unknown command\n";
+        }
+    } 
     return 0;
 }

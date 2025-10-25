@@ -48,6 +48,11 @@
         "map": "cpp",
         "thread": "cpp",
         "iomanip": "cpp",
-        "complex": "cpp"
+        "complex": "cpp",
+        "utility": "cpp",
+        "cstddef": "cpp",
+        "forward_list": "cpp",
+        "type_traits": "cpp",
+        "fstream": "cpp"
     }
 }
